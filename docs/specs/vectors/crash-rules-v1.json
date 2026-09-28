@@ -1,0 +1,2787 @@
+{
+  "description": "Reference vectors for Crash rules. bigint values are decimal strings; multipliers are in ten-thousandths (1.0000x = 10000); entropy is hex. See docs/specs/crash-round-rules.md.",
+  "rulesVersion": 1,
+  "rules": {
+    "houseEdgeBps": "300",
+    "growthPpm": "24000",
+    "maxMultiplier": "1000000"
+  },
+  "curve": [
+    "10000",
+    "10240",
+    "10485",
+    "10736",
+    "10993",
+    "11256",
+    "11526",
+    "11802",
+    "12085",
+    "12375",
+    "12672",
+    "12976",
+    "13287",
+    "13605",
+    "13931",
+    "14265",
+    "14607",
+    "14957",
+    "15315",
+    "15682",
+    "16058",
+    "16443",
+    "16837",
+    "17241",
+    "17654",
+    "18077",
+    "18510",
+    "18954",
+    "19408",
+    "19873",
+    "20349",
+    "20837",
+    "21337",
+    "21849",
+    "22373",
+    "22909",
+    "23458",
+    "24020",
+    "24596",
+    "25186",
+    "25790",
+    "26408",
+    "27041",
+    "27689",
+    "28353",
+    "29033",
+    "29729",
+    "30442",
+    "31172",
+    "31920",
+    "32686",
+    "33470",
+    "34273",
+    "35095",
+    "35937",
+    "36799",
+    "37682",
+    "38586",
+    "39512",
+    "40460",
+    "41431",
+    "42425",
+    "43443",
+    "44485",
+    "45552",
+    "46645",
+    "47764",
+    "48910",
+    "50083",
+    "51284",
+    "52514",
+    "53774",
+    "55064",
+    "56385",
+    "57738",
+    "59123",
+    "60541",
+    "61993",
+    "63480",
+    "65003",
+    "66563",
+    "68160",
+    "69795",
+    "71470",
+    "73185",
+    "74941",
+    "76739",
+    "78580",
+    "80465",
+    "82396",
+    "84373",
+    "86397",
+    "88470",
+    "90593",
+    "92767",
+    "94993",
+    "97272",
+    "99606",
+    "101996",
+    "104443",
+    "106949",
+    "109515",
+    "112143",
+    "114834",
+    "117590",
+    "120412",
+    "123301",
+    "126260",
+    "129290",
+    "132392",
+    "135569",
+    "138822",
+    "142153",
+    "145564",
+    "149057",
+    "152634",
+    "156297",
+    "160048",
+    "163889",
+    "167822",
+    "171849",
+    "175973",
+    "180196",
+    "184520",
+    "188948",
+    "193482",
+    "198125",
+    "202880",
+    "207749",
+    "212734",
+    "217839",
+    "223067",
+    "228420",
+    "233902",
+    "239515",
+    "245263",
+    "251149",
+    "257176",
+    "263348",
+    "269668",
+    "276140",
+    "282767",
+    "289553",
+    "296502",
+    "303618",
+    "310904",
+    "318365",
+    "326005",
+    "333829",
+    "341840",
+    "350044",
+    "358445",
+    "367047",
+    "375856",
+    "384876",
+    "394113",
+    "403571",
+    "413256",
+    "423174",
+    "433330",
+    "443729",
+    "454378",
+    "465283",
+    "476449",
+    "487883",
+    "499592",
+    "511582",
+    "523859",
+    "536431",
+    "549305",
+    "562488",
+    "575987",
+    "589810",
+    "603965",
+    "618460",
+    "633303",
+    "648502",
+    "664066",
+    "680003",
+    "696323",
+    "713034",
+    "730146",
+    "747669",
+    "765613",
+    "783987",
+    "802802",
+    "822069",
+    "841798",
+    "862001",
+    "882689",
+    "903873",
+    "925565",
+    "947778",
+    "970524",
+    "993816",
+    "1017667"
+  ],
+  "crashPoints": [
+    {
+      "name": "all-zero",
+      "entropy": "0000000000000000000000000000000000000000000000000000000000000000",
+      "uniform": "0",
+      "crashPoint": "10000"
+    },
+    {
+      "name": "all-ones",
+      "entropy": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "uniform": "4503599627370495",
+      "crashPoint": "1000000"
+    },
+    {
+      "name": "threshold-101-centi",
+      "entropy": "0a237c32b16d0000000000000000000000000000000000000000000000000000",
+      "uniform": "178360381282000",
+      "crashPoint": "10100"
+    },
+    {
+      "name": "below-threshold-101-centi",
+      "entropy": "0a237c32b16cf000000000000000000000000000000000000000000000000000",
+      "uniform": "178360381281999",
+      "crashPoint": "10000"
+    },
+    {
+      "name": "threshold-200-centi",
+      "entropy": "83d70a3d70a3e000000000000000000000000000000000000000000000000000",
+      "uniform": "2319353808095806",
+      "crashPoint": "20000"
+    },
+    {
+      "name": "below-threshold-200-centi",
+      "entropy": "83d70a3d70a3d000000000000000000000000000000000000000000000000000",
+      "uniform": "2319353808095805",
+      "crashPoint": "19900"
+    },
+    {
+      "name": "threshold-1000-centi",
+      "entropy": "e72b020c49ba6000000000000000000000000000000000000000000000000000",
+      "uniform": "4066750463515558",
+      "crashPoint": "100000"
+    },
+    {
+      "name": "below-threshold-1000-centi",
+      "entropy": "e72b020c49ba5000000000000000000000000000000000000000000000000000",
+      "uniform": "4066750463515557",
+      "crashPoint": "99900"
+    },
+    {
+      "name": "threshold-10000-centi",
+      "entropy": "fd844d013a92b000000000000000000000000000000000000000000000000000",
+      "uniform": "4459914710985003",
+      "crashPoint": "1000000"
+    },
+    {
+      "name": "below-threshold-10000-centi",
+      "entropy": "fd844d013a92a000000000000000000000000000000000000000000000000000",
+      "uniform": "4459914710985002",
+      "crashPoint": "999900"
+    },
+    {
+      "name": "hashed-0",
+      "entropy": "26e4da4ec23d153daca07bb945a31cc967c6a1221f8eb6f62840b06360ab3ef6",
+      "uniform": "684229711897553",
+      "crashPoint": "11400"
+    },
+    {
+      "name": "hashed-1",
+      "entropy": "dedea5b2c09a59ce04a6fe7cabe8a17e3259c46c99c95b3da53683bf485fc9f0",
+      "uniform": "3920765504981413",
+      "crashPoint": "74900"
+    },
+    {
+      "name": "hashed-2",
+      "entropy": "64bc76fd476959e95ac5fd93767a4c40411dac91a5414e829031d0c3c42262ed",
+      "uniform": "1772169807034005",
+      "crashPoint": "15900"
+    },
+    {
+      "name": "hashed-3",
+      "entropy": "9a441419845c7e2c3538949a91968440089ea19753f4c53bc8f5c608e9ea119a",
+      "uniform": "2713874970723783",
+      "crashPoint": "24400"
+    },
+    {
+      "name": "hashed-4",
+      "entropy": "7424e8216b32f6aa5433eb0a8d7579a801c5c4f5b8e704f41c64c1bcd7d80f61",
+      "uniform": "2043229794382639",
+      "crashPoint": "17700"
+    },
+    {
+      "name": "hashed-5",
+      "entropy": "295ed3f1c49b59715a90255c417d74f890a07189e8826081f176a8f7221f8f39",
+      "uniform": "727796152027573",
+      "crashPoint": "11500"
+    },
+    {
+      "name": "hashed-6",
+      "entropy": "14eeb4419a194539ec30299c7c840ff9792662e0f9b9ec7067e0fc25f2dee6f9",
+      "uniform": "368247343522196",
+      "crashPoint": "10500"
+    },
+    {
+      "name": "hashed-7",
+      "entropy": "f6c53a5dd4677a1acc9743ef06211ae2d4433477666bad8581bb698a627ecb7e",
+      "uniform": "4341231171487351",
+      "crashPoint": "269000"
+    },
+    {
+      "name": "hashed-8",
+      "entropy": "0ffe371abd11c4958ae00a971b1b400d69e915d38d10276c9f9189339ee6931c",
+      "uniform": "281352329744668",
+      "crashPoint": "10300"
+    },
+    {
+      "name": "hashed-9",
+      "entropy": "0b648a7800d697da70aa1f1d41e49bad4356af90e0f8eee49e1efd6e59d2deb1",
+      "uniform": "200423164087657",
+      "crashPoint": "10100"
+    },
+    {
+      "name": "hashed-10",
+      "entropy": "2ccd680c4ad185ad0c02e11be48db620e3597c13e07cfd2041b500c2b22914f1",
+      "uniform": "788171608861976",
+      "crashPoint": "11700"
+    },
+    {
+      "name": "hashed-11",
+      "entropy": "cde9e6369af67121ae47643d7f8419361f84ed882e2151bd898d3ec3d045620e",
+      "uniform": "3622471574597479",
+      "crashPoint": "49500"
+    },
+    {
+      "name": "hashed-12",
+      "entropy": "42e806838a20481157c79b5acab67a571ad55d374f9572d8b2b2db95413e2f5c",
+      "uniform": "1177028946076164",
+      "crashPoint": "13100"
+    },
+    {
+      "name": "hashed-13",
+      "entropy": "81ac26d471593abfc5aeeae669b09e86d29620c6282b5219901fb0d958c512d0",
+      "uniform": "2281222173037971",
+      "crashPoint": "19600"
+    },
+    {
+      "name": "hashed-14",
+      "entropy": "28f967e3e70115326ff82bbf778de71f900949723fb7b7f6c407037c0b9396fc",
+      "uniform": "720826479308817",
+      "crashPoint": "11500"
+    },
+    {
+      "name": "hashed-15",
+      "entropy": "4d0f87a6da685a67596d55c460ab0d941d5b6f42b68b203f179fb3cab34ac358",
+      "uniform": "1355665531315845",
+      "crashPoint": "13800"
+    },
+    {
+      "name": "hashed-16",
+      "entropy": "e8c38a77f23a9ad4e9a303196d017073b248ff054d606aa15de2f4e3269e0f5b",
+      "uniform": "4094824630133673",
+      "crashPoint": "106800"
+    },
+    {
+      "name": "hashed-17",
+      "entropy": "7af5fbdd1d6b62f8e2763631d95994f89d413efab96c835b3951932034eb43ca",
+      "uniform": "2163150578374326",
+      "crashPoint": "18600"
+    },
+    {
+      "name": "hashed-18",
+      "entropy": "fe4d59c501cd5924de1b4cc0a52a77de22ad19396e4fa3f6df31c6d978430f60",
+      "uniform": "4473730752322773",
+      "crashPoint": "1000000"
+    },
+    {
+      "name": "hashed-19",
+      "entropy": "8ecf9399736d80f4d60b3d57bb7501337252f956de7b1991b52731a4c850dc9b",
+      "uniform": "2512354970908376",
+      "crashPoint": "21900"
+    },
+    {
+      "name": "hashed-20",
+      "entropy": "2c951ad1b15878fed4d84d10d579649f0fe840f5e0249a7550b9de22ac96a4fa",
+      "uniform": "784302587188615",
+      "crashPoint": "11700"
+    },
+    {
+      "name": "hashed-21",
+      "entropy": "e1a5e91d4474b6ed059ab0460b321396c7553d530cac2538a69f2cb92c5ba456",
+      "uniform": "3969643149805387",
+      "crashPoint": "81800"
+    },
+    {
+      "name": "hashed-22",
+      "entropy": "bcf572debfe7c135f1dd92950ba0bd4c8f0d6e150fd4d39a50dca434cf1754a1",
+      "uniform": "3324198083362428",
+      "crashPoint": "37000"
+    },
+    {
+      "name": "hashed-23",
+      "entropy": "e5c53266ebd08e175b46a6a28fbd441377802e347386c9880538ae0dd9640ef2",
+      "uniform": "4042161870781704",
+      "crashPoint": "94600"
+    },
+    {
+      "name": "hashed-24",
+      "entropy": "068e9dc03b94a16d91b4d3abd01aa2f9ac2b35421d195498059c25d6b7290fe3",
+      "uniform": "115353627900234",
+      "crashPoint": "10000"
+    },
+    {
+      "name": "hashed-25",
+      "entropy": "7c28e1a7b994990609e851238ebaf9ea31073ede49a8bc5891fd7c0944639f6c",
+      "uniform": "2184240422426953",
+      "crashPoint": "18800"
+    },
+    {
+      "name": "hashed-26",
+      "entropy": "342f92621c29a9e320b907de4c6e0397dfb6a2272bd4c623e97400fef2a39a07",
+      "uniform": "918062784168602",
+      "crashPoint": "12100"
+    },
+    {
+      "name": "hashed-27",
+      "entropy": "52a8f71d91e6b5252bb74104f58d9b77bb72f8086d525369bb98e865c639f81c",
+      "uniform": "1454170462297707",
+      "crashPoint": "14300"
+    },
+    {
+      "name": "hashed-28",
+      "entropy": "851e99176419697dd8a1ff663828844a32d1440995cb9ca0fce293a1fb13e4dc",
+      "uniform": "2341863423361430",
+      "crashPoint": "20200"
+    },
+    {
+      "name": "hashed-29",
+      "entropy": "0ad507e86f2c29ad6d827aa30eb1a2f84f52b2cb3de07438f748888498c9736b",
+      "uniform": "190561231762114",
+      "crashPoint": "10100"
+    },
+    {
+      "name": "hashed-30",
+      "entropy": "7655f74d8ec1bbff5c944ff0d42710f3997517dba114cfd390c370ecc4e6d2d8",
+      "uniform": "2081785493646363",
+      "crashPoint": "18000"
+    },
+    {
+      "name": "hashed-31",
+      "entropy": "1ad35aff0f3225e0f52253eca2ad3438a97fc39ad6a247f4dc0956bf520940d3",
+      "uniform": "471921073386274",
+      "crashPoint": "10800"
+    },
+    {
+      "name": "hashed-32",
+      "entropy": "a39f2c8a8e8b89407322d113bd33c5e2a5b8b5e61ca425bd914e7d148f9ee94a",
+      "uniform": "2878464678488248",
+      "crashPoint": "26800"
+    },
+    {
+      "name": "hashed-33",
+      "entropy": "a14f5c57a0587489cda726bb8b5f82eace1d51ff05038712d34e4eef429c5ac7",
+      "uniform": "2837795579757959",
+      "crashPoint": "26200"
+    },
+    {
+      "name": "hashed-34",
+      "entropy": "86caf1fd60860be27028927dc0e1a194d0f98fb889568ac9b8a73ef8718ac0fe",
+      "uniform": "2371299222882400",
+      "crashPoint": "20400"
+    },
+    {
+      "name": "hashed-35",
+      "entropy": "5705b7067095fdf4e30cfcf1dd7894a6574a771717f97017b11cf9ca5452e8db",
+      "uniform": "1530912913688927",
+      "crashPoint": "14600"
+    },
+    {
+      "name": "hashed-36",
+      "entropy": "be91234f893a4718ae59b147e555a21c241bd01b4e7b1c914185f7bb8f09efb9",
+      "uniform": "3352489151206308",
+      "crashPoint": "37900"
+    },
+    {
+      "name": "hashed-37",
+      "entropy": "a3b6098b65003e626b0f166278b25fa91a9dab2fa0ddf68852869124079a2604",
+      "uniform": "2880035832090627",
+      "crashPoint": "26900"
+    },
+    {
+      "name": "hashed-38",
+      "entropy": "83b586b5e5d89794a0c825865d6b918b95e5f149fe517385e49409507db3d2d3",
+      "uniform": "2317050758192521",
+      "crashPoint": "19900"
+    },
+    {
+      "name": "hashed-39",
+      "entropy": "5697cbb698745469fdbab7ead5665d003c37a7018fbba5a4e4cc3f4fff7f4e15",
+      "uniform": "1523359324669765",
+      "crashPoint": "14600"
+    },
+    {
+      "name": "hashed-40",
+      "entropy": "8c62202cf17bed8a96afda51a2b9d4bf9bb90ba5d2c5ef9513b4931ec60abe91",
+      "uniform": "2469649191999422",
+      "crashPoint": "21400"
+    },
+    {
+      "name": "hashed-41",
+      "entropy": "c306b2a4244820326a2ceb1f9582dfc7e4fb1342964d62e641601659a8ecfa25",
+      "uniform": "3430936549147778",
+      "crashPoint": "40700"
+    },
+    {
+      "name": "hashed-42",
+      "entropy": "8c46a4f635769a43c45eb0b02f4a7782fca3da6da2fa4f996fb3e79ff4631769",
+      "uniform": "2467760691173225",
+      "crashPoint": "21400"
+    },
+    {
+      "name": "hashed-43",
+      "entropy": "0c771d768d2a4bb1c0a83e8215f33ee77503f0806604c43b1befc356dd52df5e",
+      "uniform": "219291759202980",
+      "crashPoint": "10100"
+    },
+    {
+      "name": "hashed-44",
+      "entropy": "305834e916e949a01c23774541ac365066eae2570148d1174bde39b33a49cbfb",
+      "uniform": "850486447140500",
+      "crashPoint": "11900"
+    },
+    {
+      "name": "hashed-45",
+      "entropy": "559c6f335b954b2f82326dff1c86086e0e3e8600147fa236e7880d8911dc5a55",
+      "uniform": "1506085902334292",
+      "crashPoint": "14500"
+    },
+    {
+      "name": "hashed-46",
+      "entropy": "f75a432f497be83ecb7dd040105605a607c1c49bcf8a497422353d2bc0f493a4",
+      "uniform": "4351472740636606",
+      "crashPoint": "287100"
+    },
+    {
+      "name": "hashed-47",
+      "entropy": "14fc6dd7a2eb8cabee2c6b34274f359dbf01d853a6d4a6aeab9e448cbfa1b45e",
+      "uniform": "369190514601656",
+      "crashPoint": "10500"
+    },
+    {
+      "name": "hashed-48",
+      "entropy": "4fe6fff9fa04dc944ae201e6b30421b4696917c91f4d725c746542ea7330267f",
+      "uniform": "1405656890318925",
+      "crashPoint": "14100"
+    },
+    {
+      "name": "hashed-49",
+      "entropy": "8d294e01a7d8d5878ed1dd608c090f324ff79db1b43a0154c1819968d89ecea4",
+      "uniform": "2483336670510477",
+      "crashPoint": "21600"
+    }
+  ],
+  "settlements": [
+    {
+      "name": "auto-and-manual-same-tick-auto-wins",
+      "kind": "reveal",
+      "crashPoint": "30000",
+      "crashTick": 47,
+      "bets": [
+        {
+          "id": "a",
+          "stake": "1000",
+          "autoCashOut": "20000"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "a",
+          "tick": 30
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "a",
+            "stake": "1000",
+            "outcome": "cashed-out",
+            "multiplier": "20000",
+            "payout": "2000"
+          }
+        ],
+        "totalStake": "1000",
+        "totalPayout": "2000",
+        "ignored": []
+      }
+    },
+    {
+      "name": "manual-before-auto",
+      "kind": "reveal",
+      "crashPoint": "30000",
+      "crashTick": 47,
+      "bets": [
+        {
+          "id": "a",
+          "stake": "1000",
+          "autoCashOut": "20000"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "a",
+          "tick": 29
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "a",
+            "stake": "1000",
+            "outcome": "cashed-out",
+            "multiplier": "19800",
+            "payout": "1980"
+          }
+        ],
+        "totalStake": "1000",
+        "totalPayout": "1980",
+        "ignored": []
+      }
+    },
+    {
+      "name": "manual-at-last-winning-tick",
+      "kind": "reveal",
+      "crashPoint": "20000",
+      "crashTick": 30,
+      "bets": [
+        {
+          "id": "a",
+          "stake": "1000",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "a",
+          "tick": 29
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "a",
+            "stake": "1000",
+            "outcome": "cashed-out",
+            "multiplier": "19800",
+            "payout": "1980"
+          }
+        ],
+        "totalStake": "1000",
+        "totalPayout": "1980",
+        "ignored": []
+      }
+    },
+    {
+      "name": "manual-at-crash-tick-loses",
+      "kind": "reveal",
+      "crashPoint": "20000",
+      "crashTick": 30,
+      "bets": [
+        {
+          "id": "a",
+          "stake": "1000",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "a",
+          "tick": 30
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "a",
+            "stake": "1000",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "1000",
+        "totalPayout": "0",
+        "ignored": []
+      }
+    },
+    {
+      "name": "auto-equal-to-crash-point-wins",
+      "kind": "reveal",
+      "crashPoint": "20000",
+      "crashTick": 30,
+      "bets": [
+        {
+          "id": "a",
+          "stake": "1000",
+          "autoCashOut": "20000"
+        }
+      ],
+      "cashOuts": [],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "a",
+            "stake": "1000",
+            "outcome": "cashed-out",
+            "multiplier": "20000",
+            "payout": "2000"
+          }
+        ],
+        "totalStake": "1000",
+        "totalPayout": "2000",
+        "ignored": []
+      }
+    },
+    {
+      "name": "auto-above-crash-point-loses",
+      "kind": "reveal",
+      "crashPoint": "20000",
+      "crashTick": 30,
+      "bets": [
+        {
+          "id": "a",
+          "stake": "1000",
+          "autoCashOut": "20100"
+        }
+      ],
+      "cashOuts": [],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "a",
+            "stake": "1000",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "1000",
+        "totalPayout": "0",
+        "ignored": []
+      }
+    },
+    {
+      "name": "instant-crash-nobody-wins",
+      "kind": "reveal",
+      "crashPoint": "10000",
+      "crashTick": 1,
+      "bets": [
+        {
+          "id": "a",
+          "stake": "1000",
+          "autoCashOut": "10100"
+        },
+        {
+          "id": "b",
+          "stake": "1000",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "b",
+          "tick": 0
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "a",
+            "stake": "1000",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "b",
+            "stake": "1000",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "2000",
+        "totalPayout": "0",
+        "ignored": [
+          {
+            "request": {
+              "betId": "b",
+              "tick": 0
+            },
+            "reason": "below-minimum-multiplier"
+          }
+        ]
+      }
+    },
+    {
+      "name": "duplicate-and-late-requests",
+      "kind": "reveal",
+      "crashPoint": "50000",
+      "crashTick": 69,
+      "bets": [
+        {
+          "id": "a",
+          "stake": "999",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "a",
+          "tick": 12
+        },
+        {
+          "betId": "a",
+          "tick": 5
+        },
+        {
+          "betId": "a",
+          "tick": 5
+        },
+        {
+          "betId": "a",
+          "tick": 150
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "a",
+            "stake": "999",
+            "outcome": "cashed-out",
+            "multiplier": "11200",
+            "payout": "1118"
+          }
+        ],
+        "totalStake": "999",
+        "totalPayout": "1118",
+        "ignored": []
+      }
+    },
+    {
+      "name": "payout-truncates-toward-house",
+      "kind": "reveal",
+      "crashPoint": "20000",
+      "crashTick": 30,
+      "bets": [
+        {
+          "id": "a",
+          "stake": "99",
+          "autoCashOut": "10100"
+        },
+        {
+          "id": "b",
+          "stake": "1",
+          "autoCashOut": "19900"
+        }
+      ],
+      "cashOuts": [],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "a",
+            "stake": "99",
+            "outcome": "cashed-out",
+            "multiplier": "10100",
+            "payout": "99"
+          },
+          {
+            "betId": "b",
+            "stake": "1",
+            "outcome": "cashed-out",
+            "multiplier": "19900",
+            "payout": "1"
+          }
+        ],
+        "totalStake": "100",
+        "totalPayout": "100",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-0",
+      "kind": "reveal",
+      "crashPoint": "15900",
+      "crashTick": 20,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "332187581820",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "132627395280",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-2",
+          "stake": "371574064043",
+          "autoCashOut": "222200"
+        },
+        {
+          "id": "bet-3",
+          "stake": "284942585162",
+          "autoCashOut": "779000"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-1",
+          "tick": 3
+        },
+        {
+          "betId": "bet-1",
+          "tick": 9
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "332187581820",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "132627395280",
+            "outcome": "cashed-out",
+            "multiplier": "10700",
+            "payout": "141911312949"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "371574064043",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-3",
+            "stake": "284942585162",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "1121331626305",
+        "totalPayout": "141911312949",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-1",
+      "kind": "reveal",
+      "crashPoint": "94500",
+      "crashTick": 95,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "969767895683",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "459004180879",
+          "autoCashOut": "655500"
+        },
+        {
+          "id": "bet-2",
+          "stake": "244432480196",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-1",
+          "tick": 16
+        },
+        {
+          "betId": "bet-2",
+          "tick": 12
+        },
+        {
+          "betId": "bet-2",
+          "tick": 27
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "969767895683",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "459004180879",
+            "outcome": "cashed-out",
+            "multiplier": "14600",
+            "payout": "670146104083"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "244432480196",
+            "outcome": "cashed-out",
+            "multiplier": "13200",
+            "payout": "322650873858"
+          }
+        ],
+        "totalStake": "1673204556758",
+        "totalPayout": "992796977941",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-2",
+      "kind": "reveal",
+      "crashPoint": "457500",
+      "crashTick": 162,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "126925263588",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "304907271919",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-2",
+          "stake": "241151897567",
+          "autoCashOut": "711900"
+        },
+        {
+          "id": "bet-3",
+          "stake": "530532503166",
+          "autoCashOut": "967700"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 48
+        },
+        {
+          "betId": "bet-2",
+          "tick": 102
+        },
+        {
+          "betId": "bet-2",
+          "tick": 54
+        },
+        {
+          "betId": "bet-3",
+          "tick": 156
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "126925263588",
+            "outcome": "cashed-out",
+            "multiplier": "31100",
+            "payout": "394737569758"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "304907271919",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "241151897567",
+            "outcome": "cashed-out",
+            "multiplier": "35900",
+            "payout": "865735312265"
+          },
+          {
+            "betId": "bet-3",
+            "stake": "530532503166",
+            "outcome": "cashed-out",
+            "multiplier": "403500",
+            "payout": "21406986502748"
+          }
+        ],
+        "totalStake": "1203516936240",
+        "totalPayout": "22667459384771",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-3",
+      "kind": "reveal",
+      "crashPoint": "17300",
+      "crashTick": 24,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "723992144210",
+          "autoCashOut": "381800"
+        }
+      ],
+      "cashOuts": [],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "723992144210",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "723992144210",
+        "totalPayout": "0",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-4",
+      "kind": "reveal",
+      "crashPoint": "66500",
+      "crashTick": 81,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "830874413225",
+          "autoCashOut": "540900"
+        },
+        {
+          "id": "bet-1",
+          "stake": "950876331608",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-2",
+          "stake": "282286545319",
+          "autoCashOut": "530800"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 13
+        },
+        {
+          "betId": "bet-0",
+          "tick": 35
+        },
+        {
+          "betId": "bet-2",
+          "tick": 78
+        },
+        {
+          "betId": "bet-2",
+          "tick": 75
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "830874413225",
+            "outcome": "cashed-out",
+            "multiplier": "13600",
+            "payout": "1129989201986"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "950876331608",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "282286545319",
+            "outcome": "cashed-out",
+            "multiplier": "59100",
+            "payout": "1668313482835"
+          }
+        ],
+        "totalStake": "2064037290152",
+        "totalPayout": "2798302684821",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-5",
+      "kind": "reveal",
+      "crashPoint": "79300",
+      "crashTick": 88,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "587791994449",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "357515681673",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-2",
+          "stake": "594658295868",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-3",
+          "stake": "622664757057",
+          "autoCashOut": "454000"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 4
+        },
+        {
+          "betId": "bet-1",
+          "tick": 80
+        },
+        {
+          "betId": "bet-2",
+          "tick": 67
+        },
+        {
+          "betId": "bet-3",
+          "tick": 76
+        },
+        {
+          "betId": "bet-3",
+          "tick": 4
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "587791994449",
+            "outcome": "cashed-out",
+            "multiplier": "10900",
+            "payout": "640693273949"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "357515681673",
+            "outcome": "cashed-out",
+            "multiplier": "66500",
+            "payout": "2377479283125"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "594658295868",
+            "outcome": "cashed-out",
+            "multiplier": "48900",
+            "payout": "2907879066794"
+          },
+          {
+            "betId": "bet-3",
+            "stake": "622664757057",
+            "outcome": "cashed-out",
+            "multiplier": "10900",
+            "payout": "678704585192"
+          }
+        ],
+        "totalStake": "2162630729047",
+        "totalPayout": "6604756209060",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-6",
+      "kind": "reveal",
+      "crashPoint": "19700",
+      "crashTick": 29,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "167938709994",
+          "autoCashOut": "603200"
+        },
+        {
+          "id": "bet-1",
+          "stake": "666650371236",
+          "autoCashOut": "943100"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-1",
+          "tick": 30
+        },
+        {
+          "betId": "bet-1",
+          "tick": 30
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "167938709994",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "666650371236",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "834589081230",
+        "totalPayout": "0",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-7",
+      "kind": "reveal",
+      "crashPoint": "67300",
+      "crashTick": 81,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "686460456234",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "193045433755",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-2",
+          "stake": "762689834222",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-3",
+          "stake": "542204613387",
+          "autoCashOut": "981500"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 44
+        },
+        {
+          "betId": "bet-0",
+          "tick": 72
+        },
+        {
+          "betId": "bet-1",
+          "tick": 82
+        },
+        {
+          "betId": "bet-1",
+          "tick": 51
+        },
+        {
+          "betId": "bet-2",
+          "tick": 48
+        },
+        {
+          "betId": "bet-2",
+          "tick": 47
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "686460456234",
+            "outcome": "cashed-out",
+            "multiplier": "28300",
+            "payout": "1942683091142"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "193045433755",
+            "outcome": "cashed-out",
+            "multiplier": "33400",
+            "payout": "644771748741"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "762689834222",
+            "outcome": "cashed-out",
+            "multiplier": "30400",
+            "payout": "2318577096034"
+          },
+          {
+            "betId": "bet-3",
+            "stake": "542204613387",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "2184400337598",
+        "totalPayout": "4906031935917",
+        "ignored": []
+      }
+    },
+    {
+      "name": "refund-8",
+      "kind": "refund",
+      "crashPoint": null,
+      "crashTick": null,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "832136511705",
+          "autoCashOut": "913200"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 9
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "832136511705",
+            "outcome": "refunded",
+            "payout": "832136511705"
+          }
+        ],
+        "totalStake": "832136511705",
+        "totalPayout": "832136511705",
+        "ignored": []
+      }
+    },
+    {
+      "name": "forfeit-9",
+      "kind": "forfeit",
+      "crashPoint": null,
+      "crashTick": null,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "684768429878",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "546286116676",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-2",
+          "stake": "137152586239",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-3",
+          "stake": "688069967990",
+          "autoCashOut": "839200"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 6
+        },
+        {
+          "betId": "bet-0",
+          "tick": 2
+        },
+        {
+          "betId": "bet-1",
+          "tick": 4
+        },
+        {
+          "betId": "bet-1",
+          "tick": 4
+        },
+        {
+          "betId": "bet-3",
+          "tick": 6
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "684768429878",
+            "outcome": "cashed-out",
+            "multiplier": "10400",
+            "payout": "712159167073"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "546286116676",
+            "outcome": "cashed-out",
+            "multiplier": "10900",
+            "payout": "595451867176"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "137152586239",
+            "outcome": "refunded",
+            "payout": "137152586239"
+          },
+          {
+            "betId": "bet-3",
+            "stake": "688069967990",
+            "outcome": "cashed-out",
+            "multiplier": "11500",
+            "payout": "791280463188"
+          }
+        ],
+        "totalStake": "2056277100783",
+        "totalPayout": "2236044083676",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-10",
+      "kind": "reveal",
+      "crashPoint": "13700",
+      "crashTick": 14,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "305289876468",
+          "autoCashOut": "33000"
+        },
+        {
+          "id": "bet-1",
+          "stake": "77045505890",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-1",
+          "tick": 2
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "305289876468",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "77045505890",
+            "outcome": "cashed-out",
+            "multiplier": "10400",
+            "payout": "80127326125"
+          }
+        ],
+        "totalStake": "382335382358",
+        "totalPayout": "80127326125",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-11",
+      "kind": "reveal",
+      "crashPoint": "13300",
+      "crashTick": 13,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "24905421295",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 14
+        },
+        {
+          "betId": "bet-0",
+          "tick": 0
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "24905421295",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "24905421295",
+        "totalPayout": "0",
+        "ignored": [
+          {
+            "request": {
+              "betId": "bet-0",
+              "tick": 0
+            },
+            "reason": "below-minimum-multiplier"
+          }
+        ]
+      }
+    },
+    {
+      "name": "reveal-12",
+      "kind": "reveal",
+      "crashPoint": "15700",
+      "crashTick": 20,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "991378199510",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "334220010509",
+          "autoCashOut": "406700"
+        },
+        {
+          "id": "bet-2",
+          "stake": "787369334838",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-3",
+          "stake": "606405560514",
+          "autoCashOut": "882300"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 5
+        },
+        {
+          "betId": "bet-0",
+          "tick": 4
+        },
+        {
+          "betId": "bet-1",
+          "tick": 2
+        },
+        {
+          "betId": "bet-1",
+          "tick": 6
+        },
+        {
+          "betId": "bet-2",
+          "tick": 22
+        },
+        {
+          "betId": "bet-3",
+          "tick": 4
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "991378199510",
+            "outcome": "cashed-out",
+            "multiplier": "10900",
+            "payout": "1080602237465"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "334220010509",
+            "outcome": "cashed-out",
+            "multiplier": "10400",
+            "payout": "347588810929"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "787369334838",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-3",
+            "stake": "606405560514",
+            "outcome": "cashed-out",
+            "multiplier": "10900",
+            "payout": "660982060960"
+          }
+        ],
+        "totalStake": "2719373105371",
+        "totalPayout": "2089173109354",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-13",
+      "kind": "reveal",
+      "crashPoint": "11200",
+      "crashTick": 6,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "50854820833",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "356230102008",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-2",
+          "stake": "661341922511",
+          "autoCashOut": "16000"
+        },
+        {
+          "id": "bet-3",
+          "stake": "932127410952",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 5
+        },
+        {
+          "betId": "bet-0",
+          "tick": 2
+        },
+        {
+          "betId": "bet-1",
+          "tick": 8
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "50854820833",
+            "outcome": "cashed-out",
+            "multiplier": "10400",
+            "payout": "52889013666"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "356230102008",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "661341922511",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-3",
+            "stake": "932127410952",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "2000554256304",
+        "totalPayout": "52889013666",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-14",
+      "kind": "reveal",
+      "crashPoint": "175400",
+      "crashTick": 121,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "960726723381",
+          "autoCashOut": "204600"
+        }
+      ],
+      "cashOuts": [],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "960726723381",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "960726723381",
+        "totalPayout": "0",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-15",
+      "kind": "reveal",
+      "crashPoint": "19000",
+      "crashTick": 28,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "708219299853",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "315694755710",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 18
+        },
+        {
+          "betId": "bet-0",
+          "tick": 21
+        },
+        {
+          "betId": "bet-1",
+          "tick": 11
+        },
+        {
+          "betId": "bet-1",
+          "tick": 6
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "708219299853",
+            "outcome": "cashed-out",
+            "multiplier": "15300",
+            "payout": "1083575528775"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "315694755710",
+            "outcome": "cashed-out",
+            "multiplier": "11500",
+            "payout": "363048969066"
+          }
+        ],
+        "totalStake": "1023914055563",
+        "totalPayout": "1446624497841",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-16",
+      "kind": "reveal",
+      "crashPoint": "32000",
+      "crashTick": 50,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "179046257834",
+          "autoCashOut": "19700"
+        },
+        {
+          "id": "bet-1",
+          "stake": "200017561532",
+          "autoCashOut": "277000"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 3
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "179046257834",
+            "outcome": "cashed-out",
+            "multiplier": "10700",
+            "payout": "191579495882"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "200017561532",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "379063819366",
+        "totalPayout": "191579495882",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-17",
+      "kind": "reveal",
+      "crashPoint": "18800",
+      "crashTick": 27,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "941804802106",
+          "autoCashOut": "884400"
+        },
+        {
+          "id": "bet-1",
+          "stake": "369283755637",
+          "autoCashOut": "79100"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-1",
+          "tick": 19
+        },
+        {
+          "betId": "bet-1",
+          "tick": 19
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "941804802106",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "369283755637",
+            "outcome": "cashed-out",
+            "multiplier": "15600",
+            "payout": "576082658793"
+          }
+        ],
+        "totalStake": "1311088557743",
+        "totalPayout": "576082658793",
+        "ignored": []
+      }
+    },
+    {
+      "name": "refund-18",
+      "kind": "refund",
+      "crashPoint": null,
+      "crashTick": null,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "182279428079",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "683438826927",
+          "autoCashOut": "101900"
+        },
+        {
+          "id": "bet-2",
+          "stake": "246882699125",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-3",
+          "stake": "325168648649",
+          "autoCashOut": "929700"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 23
+        },
+        {
+          "betId": "bet-1",
+          "tick": 19
+        },
+        {
+          "betId": "bet-3",
+          "tick": 19
+        },
+        {
+          "betId": "bet-3",
+          "tick": 5
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "182279428079",
+            "outcome": "refunded",
+            "payout": "182279428079"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "683438826927",
+            "outcome": "refunded",
+            "payout": "683438826927"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "246882699125",
+            "outcome": "refunded",
+            "payout": "246882699125"
+          },
+          {
+            "betId": "bet-3",
+            "stake": "325168648649",
+            "outcome": "refunded",
+            "payout": "325168648649"
+          }
+        ],
+        "totalStake": "1437769602780",
+        "totalPayout": "1437769602780",
+        "ignored": []
+      }
+    },
+    {
+      "name": "forfeit-19",
+      "kind": "forfeit",
+      "crashPoint": null,
+      "crashTick": null,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "34224885679",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "98832966625",
+          "autoCashOut": "806800"
+        },
+        {
+          "id": "bet-2",
+          "stake": "115964476953",
+          "autoCashOut": "975900"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 5
+        },
+        {
+          "betId": "bet-0",
+          "tick": 52
+        },
+        {
+          "betId": "bet-1",
+          "tick": 40
+        },
+        {
+          "betId": "bet-2",
+          "tick": 22
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "34224885679",
+            "outcome": "cashed-out",
+            "multiplier": "11200",
+            "payout": "38331871960"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "98832966625",
+            "outcome": "cashed-out",
+            "multiplier": "25700",
+            "payout": "254000724226"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "115964476953",
+            "outcome": "cashed-out",
+            "multiplier": "16800",
+            "payout": "194820321281"
+          }
+        ],
+        "totalStake": "249022329257",
+        "totalPayout": "487152917467",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-20",
+      "kind": "reveal",
+      "crashPoint": "22500",
+      "crashTick": 35,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "908001136558",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "153796306667",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-2",
+          "stake": "771378289296",
+          "autoCashOut": "167000"
+        },
+        {
+          "id": "bet-3",
+          "stake": "743542432193",
+          "autoCashOut": "882600"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-1",
+          "tick": 23
+        },
+        {
+          "betId": "bet-1",
+          "tick": 21
+        },
+        {
+          "betId": "bet-2",
+          "tick": 27
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "908001136558",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "153796306667",
+            "outcome": "cashed-out",
+            "multiplier": "16400",
+            "payout": "252225942933"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "771378289296",
+            "outcome": "cashed-out",
+            "multiplier": "18900",
+            "payout": "1457904966769"
+          },
+          {
+            "betId": "bet-3",
+            "stake": "743542432193",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "2576718164714",
+        "totalPayout": "1710130909702",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-21",
+      "kind": "reveal",
+      "crashPoint": "14300",
+      "crashTick": 16,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "547051221004",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "341438912495",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 15
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "547051221004",
+            "outcome": "cashed-out",
+            "multiplier": "14200",
+            "payout": "776812733825"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "341438912495",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "888490133499",
+        "totalPayout": "776812733825",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-22",
+      "kind": "reveal",
+      "crashPoint": "24200",
+      "crashTick": 38,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "17925355509",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "17925355509",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "17925355509",
+        "totalPayout": "0",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-23",
+      "kind": "reveal",
+      "crashPoint": "13400",
+      "crashTick": 13,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "20001156017",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "304031545955",
+          "autoCashOut": "694700"
+        },
+        {
+          "id": "bet-2",
+          "stake": "340449915955",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-3",
+          "stake": "516704005149",
+          "autoCashOut": "343300"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 11
+        },
+        {
+          "betId": "bet-1",
+          "tick": 12
+        },
+        {
+          "betId": "bet-1",
+          "tick": 3
+        },
+        {
+          "betId": "bet-2",
+          "tick": 1
+        },
+        {
+          "betId": "bet-2",
+          "tick": 5
+        },
+        {
+          "betId": "bet-3",
+          "tick": 15
+        },
+        {
+          "betId": "bet-3",
+          "tick": 8
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "20001156017",
+            "outcome": "cashed-out",
+            "multiplier": "12900",
+            "payout": "25801491261"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "304031545955",
+            "outcome": "cashed-out",
+            "multiplier": "10700",
+            "payout": "325313754171"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "340449915955",
+            "outcome": "cashed-out",
+            "multiplier": "10200",
+            "payout": "347258914274"
+          },
+          {
+            "betId": "bet-3",
+            "stake": "516704005149",
+            "outcome": "cashed-out",
+            "multiplier": "12000",
+            "payout": "620044806178"
+          }
+        ],
+        "totalStake": "1181186623076",
+        "totalPayout": "1318418965884",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-24",
+      "kind": "reveal",
+      "crashPoint": "15700",
+      "crashTick": 20,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "934147178726",
+          "autoCashOut": "337700"
+        },
+        {
+          "id": "bet-1",
+          "stake": "65132630321",
+          "autoCashOut": "183200"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 22
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "934147178726",
+            "outcome": "lost",
+            "payout": "0"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "65132630321",
+            "outcome": "lost",
+            "payout": "0"
+          }
+        ],
+        "totalStake": "999279809047",
+        "totalPayout": "0",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-25",
+      "kind": "reveal",
+      "crashPoint": "50400",
+      "crashTick": 69,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "970992924396",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-1",
+          "stake": "80747558800",
+          "autoCashOut": null
+        },
+        {
+          "id": "bet-2",
+          "stake": "488535534649",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 26
+        },
+        {
+          "betId": "bet-0",
+          "tick": 6
+        },
+        {
+          "betId": "bet-1",
+          "tick": 16
+        },
+        {
+          "betId": "bet-2",
+          "tick": 68
+        },
+        {
+          "betId": "bet-2",
+          "tick": 59
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "970992924396",
+            "outcome": "cashed-out",
+            "multiplier": "11500",
+            "payout": "1116641863055"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "80747558800",
+            "outcome": "cashed-out",
+            "multiplier": "14600",
+            "payout": "117891435848"
+          },
+          {
+            "betId": "bet-2",
+            "stake": "488535534649",
+            "outcome": "cashed-out",
+            "multiplier": "40400",
+            "payout": "1973683559981"
+          }
+        ],
+        "totalStake": "1540276017845",
+        "totalPayout": "3208216858884",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-26",
+      "kind": "reveal",
+      "crashPoint": "59600",
+      "crashTick": 76,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "711467640578",
+          "autoCashOut": "204000"
+        },
+        {
+          "id": "bet-1",
+          "stake": "708270023559",
+          "autoCashOut": "335400"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 65
+        },
+        {
+          "betId": "bet-0",
+          "tick": 10
+        },
+        {
+          "betId": "bet-1",
+          "tick": 5
+        },
+        {
+          "betId": "bet-1",
+          "tick": 64
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "711467640578",
+            "outcome": "cashed-out",
+            "multiplier": "12600",
+            "payout": "896449227128"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "708270023559",
+            "outcome": "cashed-out",
+            "multiplier": "11200",
+            "payout": "793262426386"
+          }
+        ],
+        "totalStake": "1419737664137",
+        "totalPayout": "1689711653514",
+        "ignored": []
+      }
+    },
+    {
+      "name": "reveal-27",
+      "kind": "reveal",
+      "crashPoint": "35200",
+      "crashTick": 54,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "814657777959",
+          "autoCashOut": "16900"
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 50
+        },
+        {
+          "betId": "bet-0",
+          "tick": 55
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "814657777959",
+            "outcome": "cashed-out",
+            "multiplier": "16900",
+            "payout": "1376771644750"
+          }
+        ],
+        "totalStake": "814657777959",
+        "totalPayout": "1376771644750",
+        "ignored": []
+      }
+    },
+    {
+      "name": "refund-28",
+      "kind": "refund",
+      "crashPoint": null,
+      "crashTick": null,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "790861651170",
+          "autoCashOut": "469900"
+        },
+        {
+          "id": "bet-1",
+          "stake": "329875940552",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 17
+        },
+        {
+          "betId": "bet-1",
+          "tick": 16
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "790861651170",
+            "outcome": "refunded",
+            "payout": "790861651170"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "329875940552",
+            "outcome": "refunded",
+            "payout": "329875940552"
+          }
+        ],
+        "totalStake": "1120737591722",
+        "totalPayout": "1120737591722",
+        "ignored": []
+      }
+    },
+    {
+      "name": "forfeit-29",
+      "kind": "forfeit",
+      "crashPoint": null,
+      "crashTick": null,
+      "bets": [
+        {
+          "id": "bet-0",
+          "stake": "149457594398",
+          "autoCashOut": "907700"
+        },
+        {
+          "id": "bet-1",
+          "stake": "254683793139",
+          "autoCashOut": null
+        }
+      ],
+      "cashOuts": [
+        {
+          "betId": "bet-0",
+          "tick": 2
+        },
+        {
+          "betId": "bet-1",
+          "tick": 2
+        }
+      ],
+      "expected": {
+        "settlements": [
+          {
+            "betId": "bet-0",
+            "stake": "149457594398",
+            "outcome": "cashed-out",
+            "multiplier": "10400",
+            "payout": "155435898173"
+          },
+          {
+            "betId": "bet-1",
+            "stake": "254683793139",
+            "outcome": "cashed-out",
+            "multiplier": "10400",
+            "payout": "264871144864"
+          }
+        ],
+        "totalStake": "404141387537",
+        "totalPayout": "420307043037",
+        "ignored": []
+      }
+    }
+  ],
+  "betValidation": {
+    "limits": {
+      "minStake": "1000000",
+      "maxStake": "10000000000",
+      "maxPayout": "100000000000",
+      "maxRoundExposure": "1000000000000"
+    },
+    "maxMultiplier": "1000000",
+    "cases": [
+      {
+        "name": "min-stake",
+        "bet": {
+          "stake": "1000000",
+          "autoCashOut": null
+        },
+        "expected": {
+          "ok": true,
+          "value": "100000000"
+        }
+      },
+      {
+        "name": "below-min-stake",
+        "bet": {
+          "stake": "999999",
+          "autoCashOut": null
+        },
+        "expected": {
+          "ok": false,
+          "error": "stake-below-minimum"
+        }
+      },
+      {
+        "name": "max-stake-with-auto",
+        "bet": {
+          "stake": "10000000000",
+          "autoCashOut": "20000"
+        },
+        "expected": {
+          "ok": true,
+          "value": "20000000000"
+        }
+      },
+      {
+        "name": "above-max-stake",
+        "bet": {
+          "stake": "10000000001",
+          "autoCashOut": "20000"
+        },
+        "expected": {
+          "ok": false,
+          "error": "stake-above-maximum"
+        }
+      },
+      {
+        "name": "not-centi-precise",
+        "bet": {
+          "stake": "1000000",
+          "autoCashOut": "20050"
+        },
+        "expected": {
+          "ok": false,
+          "error": "auto-cash-out-not-centi-precise"
+        }
+      },
+      {
+        "name": "auto-below-minimum",
+        "bet": {
+          "stake": "1000000",
+          "autoCashOut": "10000"
+        },
+        "expected": {
+          "ok": false,
+          "error": "auto-cash-out-below-minimum"
+        }
+      },
+      {
+        "name": "auto-at-minimum",
+        "bet": {
+          "stake": "1000000",
+          "autoCashOut": "10100"
+        },
+        "expected": {
+          "ok": true,
+          "value": "1010000"
+        }
+      },
+      {
+        "name": "auto-at-maximum",
+        "bet": {
+          "stake": "1000000",
+          "autoCashOut": "1000000"
+        },
+        "expected": {
+          "ok": true,
+          "value": "100000000"
+        }
+      },
+      {
+        "name": "auto-above-maximum",
+        "bet": {
+          "stake": "1000000",
+          "autoCashOut": "1000100"
+        },
+        "expected": {
+          "ok": false,
+          "error": "auto-cash-out-above-maximum"
+        }
+      },
+      {
+        "name": "payout-at-maximum",
+        "bet": {
+          "stake": "1000000000",
+          "autoCashOut": null
+        },
+        "expected": {
+          "ok": true,
+          "value": "100000000000"
+        }
+      },
+      {
+        "name": "payout-above-maximum",
+        "bet": {
+          "stake": "1000000001",
+          "autoCashOut": null
+        },
+        "expected": {
+          "ok": false,
+          "error": "payout-above-maximum"
+        }
+      }
+    ]
+  }
+}

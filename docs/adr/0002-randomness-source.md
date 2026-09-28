@@ -1,6 +1,9 @@
 # ADR 0002 — Fuente de randomness y ciclo provably fair
 
-- Estado: **propuesto** (pendiente de aceptación; no se implementa ningún algoritmo ni proveedor hasta aceptarlo)
+- Estado: **aceptado parcialmente** el 2026-09-28.
+  - Aceptados: el esquema C y la regla `forfeit`.
+  - Pendiente: el proveedor VRF, que se elegirá tras el [spike en devnet](../spikes/vrf-devnet.md).
+  - No se implementa ningún proveedor hasta cerrar el spike.
 - Fecha: 2026-09-28
 - Relacionado: [ADR 0001](0001-settlement-authority.md), [spec de reglas de ronda](../specs/crash-round-rules.md)
 
@@ -73,6 +76,26 @@ Los parámetros del algoritmo se versionan por ronda para que los verificadores 
 ## Recomendación preliminar
 
 **Opción C**: compromiso por ronda o hash chain, más VRF solicitado al cerrar las apuestas, más la regla `forfeit` para la no revelación. Supuesto de confianza residual declarado: **el operador conoce el resultado durante la ronda y podría filtrarlo**.
+
+## Decisión (parcial)
+
+Se aceptan:
+- el **esquema C**: `entropy = H(tag_round ‖ program_id ‖ round_id ‖ s ‖ e)`, con `s` comprometida antes de abrir las apuestas y `e` procedente de un VRF solicitado al cerrarlas;
+- la regla **`forfeit`** para una no revelación tras empezar la ronda;
+- el supuesto de confianza residual (el operador conoce el resultado durante la ronda), aceptado para el MVP en devnet.
+
+Siguen abiertas las preguntas 1 a 4. El spike resuelve la 1. La 3 se concreta en la spec del programa.
+
+## Propuesta de cierre (pendiente de aceptación)
+
+Se basa en los datos medidos en el [spike](../spikes/vrf-devnet.md) (100/100 rondas correctas en devnet, p95 de 28 slots, 10 000 lamports por ronda).
+
+1. **Proveedor VRF:** Switchboard On-Demand. ORAO queda descartado porque no es compatible con Anchor 1.x.
+2. **Nueva regla de seguridad:** la cuenta de randomness de la casa tiene como authority una **PDA del programa**. El motivo es que Switchboard exige esa firma para el reveal, y el payload del reveal lo puede obtener cualquiera. Si la authority fuese el operador, conocería `e` (y con ello el crash point) antes que nadie y podría dejar la ronda sin empezar para forzar un reembolso. Con la PDA, `close_betting` hace la CPI de commit y `start_round` hace la CPI de reveal; las dos son sin permisos, así que cualquier jugador puede empezar la ronda.
+3. **Liveness:** si la ronda sigue en `Betting` pasado `betting_end_slot + entropy_timeout_slots`, cualquiera puede anularla. Hoy solo puede el operador.
+4. **Supuesto de confianza residual:** además de lo ya aceptado (el operador conoce el resultado durante la ronda), se confía en la integridad del TEE y del oráculo de Switchboard. Su salida no es una prueba VRF verificable matemáticamente.
+
+Con esta propuesta, la pregunta 1 queda resuelta y la 3 se concreta en `entropy_timeout_slots = 150`. La 2 se resuelve con un compromiso por ronda.
 
 ## Preguntas abiertas
 

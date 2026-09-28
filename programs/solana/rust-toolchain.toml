@@ -1,0 +1,6 @@
+[toolchain]
+# Host toolchain for tests and IDL; LiteSVM 0.17 (Agave 4.3) requires rustc >= 1.97.1.
+# SBF builds use the platform-tools compiler regardless of this setting.
+channel = "1.98.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

@@ -1,0 +1,13 @@
+[package]
+name = "crash-rules"
+version = "0.1.0"
+description = "Pure, chain-agnostic Crash rules (docs/specs/crash-round-rules.md), shared by the on-chain program and its tests"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+
+[dev-dependencies]
+serde_json = "1"
+proptest = "1"

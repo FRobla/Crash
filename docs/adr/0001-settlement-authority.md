@@ -1,6 +1,6 @@
 # ADR 0001 — Autoridad de settlement de Crash
 
-- Estado: **propuesto** (pendiente de aceptación; no hay código que dependa de esta decisión)
+- Estado: **aceptado** el 2026-09-28: opción A con **Anchor** como framework del programa. Ver [Decisión](#decisión)
 - Fecha: 2026-09-28
 - Relacionado: [ADR 0002](0002-randomness-source.md), [spec de reglas de ronda](../specs/crash-round-rules.md)
 
@@ -59,7 +59,17 @@ Apuestas y liquidación on-chain; cash-outs manuales ordenados off-chain por el 
 
 **Opción A.** Es la única que cumple sin supuestos adicionales los requisitos de orden verificable y de no convertir al operador en autoridad económica. El coste es latencia percibida en cash-outs manuales, comisiones por transacción y la introducción de Rust y un toolchain de programas.
 
-## Consecuencias si se acepta
+## Decisión
+
+Se acepta la **opción A**. Queda así:
+- **Autoridad:** un programa on-chain construido con **Anchor**.
+- **Tick:** un slot, contado como `slot − start_slot`.
+- **Parámetros de la curva:** los de `CRASH_RULES_V1` (ver spec de reglas).
+- **Toolchain:** Rust, Solana CLI (Anza) y Anchor a través de `avm`. Se instalan en WSL Ubuntu porque Anchor no soporta Windows de forma nativa.
+
+El diseño detallado de cuentas, instrucciones e invariantes está en [`docs/specs/crash-program.md`](../specs/crash-program.md). Las preguntas abiertas 2–4 pasan a esa spec.
+
+## Consecuencias
 
 - Se añadirá un directorio para el programa on-chain (p. ej. `chain-adapters/solana/programs/crash` o un workspace Anchor en la raíz; decidir al implementar) y su toolchain.
 - El programa debe reimplementar las reglas del motor con resultados **idénticos**. Los vectores de prueba generados desde `src/games/crash/domain/` serán la referencia compartida entre TypeScript y Rust.
@@ -69,7 +79,7 @@ Apuestas y liquidación on-chain; cash-outs manuales ordenados off-chain por el 
 
 ## Preguntas abiertas
 
-1. Framework del programa: Anchor, Rust nativo o Pinocchio.
+1. ~~Framework del programa~~: resuelto, se usa Anchor.
 2. ¿Quién puede ejecutar la liquidación (cualquiera / operador) y quién paga sus comisiones?
 3. Gestión de la autoridad de upgrade del programa (multisig, timelock, congelación).
 4. Priority fees: ¿las paga el jugador, el operador o se subsidian?

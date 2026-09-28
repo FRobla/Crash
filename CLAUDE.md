@@ -21,6 +21,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Pruebas (una pasada / modo watch) | `pnpm test` / `pnpm test:watch` |
 | Un archivo o una prueba concreta | `pnpm vitest run src/games/crash/ui/BetPanel.test.tsx -t "disables placing"` |
 | Auditoría de dependencias | `pnpm audit` |
+| Regenerar vectores de referencia tras un cambio **deliberado** de reglas | `pnpm vitest run reference-vectors -u` |
+
+### Toolchain on-chain (Solana / Anchor)
+
+Anchor no soporta Windows de forma nativa. El toolchain vive en **WSL `Ubuntu-24.04`**; se ejecuta con `wsl -d Ubuntu-24.04 -- bash -lc "<comando>"`.
+
+| Herramienta | Versión fijada (2026-09-28) | Origen |
+| --- | --- | --- |
+| Rust (`rustup`, stable) | rustc/cargo 1.98.1 | `sh.rustup.rs` |
+| Solana CLI (Agave) | 4.3.0 | `release.anza.xyz` |
+| Anchor (`avm`) | anchor-cli 1.2.0, avm 1.2.0 | `github.com/solana-foundation/anchor` |
+
+- `solana config get` debe apuntar a `https://api.devnet.solana.com`. El keypair de WSL (`~/.config/solana/id.json`) es **solo de desarrollo**: vive fuera del repo, nunca se commitea ni se usa con fondos reales.
+- El repo está en `/mnt/c/...`. Compilar Rust sobre el sistema de archivos de Windows es lento; si molesta, clona el repo dentro de WSL.
+- Workspace Anchor en `programs/solana/` (spec: `docs/specs/crash-program.md`). `rust-toolchain.toml` fija rustc **1.98.1** para pruebas e IDL (LiteSVM 0.17/Agave 4.3 exige ≥ 1.97.1); el `.so` lo compila platform-tools (SBPF v3). LiteSVM 0.10 —el que trae la plantilla de Anchor 1.2— no carga SBPF v3: usa 0.17.
+- Usa `CARGO_TARGET_DIR="$HOME/.cache/crashit/target"` (fuera de `/mnt/c`, mucho más rápido). El keypair del programa queda en `$CARGO_TARGET_DIR/deploy/crash-keypair.json`, nunca en el repo; en otra máquina, `anchor keys sync` genera uno nuevo y actualiza `declare_id!`/`Anchor.toml`.
+
+| Tarea (dentro de WSL, en `programs/solana/`) | Comando |
+| --- | --- |
+| Compilar el programa (+ IDL) | `anchor build` |
+| Todas las pruebas Rust (reglas puras + LiteSVM; requieren `anchor build` previo) | `cargo test` |
+| Solo la lógica pura contra los vectores | `cargo test -p crash-rules` |
 
 Las pruebas viven junto al código (`*.test.ts[x]` bajo `src/`). Vitest no soporta Server Components `async`; esos se cubrirán con pruebas E2E cuando existan.
 
@@ -37,17 +59,23 @@ src/
   games/crash/domain/   # Motor puro de Crash: curva, crash point, límites, liquidación, ciclo de vida
   games/crash/ui/       # Presentación de Crash (todavía sin conectar al motor)
   chain-adapters/solana/  # Config devnet, salud del RPC, wallet adapter, activos
+programs/solana/        # Workspace Anchor (Rust); fuera de src/ y del toolchain JS
+  crates/crash-rules/   # Reglas puras en Rust (no_std, sin Anchor); reproducen los vectores de TS exactamente
+  programs/crash/       # Programa on-chain: autoridad de apuestas, cash-outs y liquidación (tests LiteSVM)
 docs/
-  specs/                # Especificaciones (spec-first); crash-round-rules.md define el motor
+  specs/                # Especificaciones (spec-first): reglas de ronda y programa on-chain
+    vectors/            # Vectores de referencia generados por el motor (TS ↔ Rust ↔ verificadores)
   adr/                  # Decisiones de arquitectura; estado propuesto/aceptado en cada una
+  spikes/               # Experimentos acotados que alimentan decisiones (p. ej., proveedor VRF)
 ```
 
 - `games/crash/domain/` es TypeScript puro: sin React, Next, Solana ni reloj/aleatoriedad. Importes en `bigint` (unidades base), multiplicadores en `bigint` de diezmilésimas. Cualquier cambio de reglas exige actualizar primero `docs/specs/crash-round-rules.md` y sus invariantes (pruebas de propiedades con `fast-check`).
+- Las reglas se versionan (`CRASH_RULES_V1` en `domain/rules.ts`): una versión publicada es inmutable. Cambiar algoritmo o parámetros exige una versión nueva con su propio `docs/specs/vectors/crash-rules-v<N>.json`; la prueba `reference-vectors.test.ts` falla si el JSON no coincide con el motor.
 
 Límites de dependencias:
 - `games/*` y `platform/*` no importan de `chain-adapters/*`. La composición ocurre en `src/app` (p. ej., `app/(dashboard)/layout.tsx` inyecta los componentes de Solana en los slots del shell).
 - `chain-adapters/*` puede depender de puertos y UI de `platform/*`, nunca al revés.
-- Las reglas de Crash ya viven en `src/games/crash/domain/`. Randomness, house bank y settlement on-chain se añadirán en `src/platform/*` y `src/chain-adapters/*` cuando se acepten los ADRs 0001/0002 y exista su especificación; no crees carpetas vacías por adelantado.
+- Las reglas de Crash ya viven en `src/games/crash/domain/`. La autoridad de settlement es un programa Anchor (ADR 0001, aceptado) especificado en `docs/specs/crash-program.md` (pendiente de aprobación); randomness usa el esquema de ADR 0002 con proveedor VRF pendiente del spike. No crees carpetas vacías por adelantado.
 
 ## Producto
 

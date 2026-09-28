@@ -1,9 +1,9 @@
 # Spec — Reglas de ronda de Crash (motor de dominio)
 
-- Estado: **borrador v0.1**. Los parámetros marcados como *propuesto* no están aprobados. Esta spec no habilita fondos reales.
+- Estado: **v1**. Los parámetros de `CRASH_RULES_V1` (§5.1) están aprobados **solo para devnet** y deben pasar una revisión de riesgo antes de usar fondos reales. Esta spec no habilita fondos reales.
 - Fecha: 2026-09-28
 - Implementación: `src/games/crash/domain/`
-- Decisiones relacionadas: [ADR 0001 — settlement](../adr/0001-settlement-authority.md), [ADR 0002 — randomness](../adr/0002-randomness-source.md). Ambos están propuestos.
+- Decisiones relacionadas: [ADR 0001 — settlement](../adr/0001-settlement-authority.md) (aceptado) y [ADR 0002 — randomness](../adr/0002-randomness-source.md) (aceptado parcialmente).
 
 ## 1. Alcance
 
@@ -69,7 +69,7 @@ reconocido(n) = ⌊mₙ / 100⌋ · 100
 - `growthPpm ∈ [1_000, 1_000_000]`. Con `growthPpm ≥ 100` la curva ya es estrictamente creciente; el mínimo de 1_000 acota el tamaño de la tabla.
 - La curva se precalcula hasta el primer tick cuyo multiplicador reconocido supera `maxMultiplier`, que es el horizonte. Consultar un tick fuera del horizonte es un error de programación (`RangeError`).
 - **Crash tick** de un crash point `c`: el primer tick `n` con `reconocido(n) > c`. Siempre existe dentro del horizonte, porque `c ≤ maxMultiplier`.
-- *Propuesto:* `growthPpm = 24_000` (+2.4 % por tick). Con ticks de un slot (≈400 ms) da unos 2x a los 12 s y 10x a los 39 s. Queda pendiente de ADR 0001.
+- **v1 (aprobado para devnet):** `growthPpm = 24_000` (+2.4 % por tick). Con ticks de un slot (≈400 ms) da unos 2x a los 12 s y 10x a los 39 s.
 
 ## 5. Crash point
 
@@ -83,14 +83,28 @@ crash  = min(max(raw, 100) · 100, maxMultiplier)          // diezmilésimas, m�
 ```
 
 Parámetros:
-- `houseEdgeBps ∈ [0, 10_000)`. *Propuesto:* `300`.
-- `maxMultiplier`: múltiplo de 100 en `[1.01x, 1_000_000x]`. *Propuesto:* `100x`, pendiente de fijarse junto con los límites de exposición.
+- `houseEdgeBps ∈ [0, 10_000)`. **v1:** `300`.
+- `maxMultiplier`: múltiplo de 100 en `[1.01x, 1_000_000x]`. **v1:** `100x`.
 
 Propiedades (demostradas en §8 y probadas):
 - Para cualquier objetivo `m` con precisión de centésimas y `1.01x ≤ m ≤ maxMultiplier`: `P(crash ≥ m) = ⌊(10_000 − edge) · E / (10_000 · m_centi)⌋ / E`. Es decir, `(1 − edge)/m` con un error menor que `2⁻⁵²`.
 - En consecuencia, el **RTP de cualquier estrategia de objetivo fijo es `1 − edge`** (97 % con la propuesta), con un error `≤ m · 2⁻⁵²`.
 - `P(crash < 1.01x) = 1 − (1 − edge)/1.01 ≈ 3.96 %`. Dentro de esa cifra, `P(raw < 1.00x) = edge` (3 %) corresponde a las rondas limitadas a 1.00x.
 - El límite `maxMultiplier` no altera el RTP de los objetivos `≤ maxMultiplier`, porque el cap solo afecta a rondas que ya habrían superado cualquier objetivo admitido.
+
+### 5.1 Versiones de reglas
+
+Cada ronda registra la `rulesVersion` con la que se jugó. Una versión es un conjunto **inmutable** que incluye:
+- el algoritmo (curva y crash point);
+- los parámetros.
+
+Por eso, cambiar cualquiera de los dos exige una versión nueva, y el verificador conserva todas las versiones anteriores para poder reproducir rondas históricas.
+
+| Versión | `houseEdgeBps` | `growthPpm` | `maxMultiplier` | Ticks de la curva | Estado |
+| --- | --- | --- | --- | --- | --- |
+| 1 (`CRASH_RULES_V1`) | 300 | 24_000 | 1_000_000 (100x) | 196 | Aprobada para devnet |
+
+Los vectores de referencia de cada versión están en `docs/specs/vectors/crash-rules-v<N>.json`. Los genera el motor TypeScript, y cualquier otra implementación (el programa on-chain en Rust o un verificador independiente) debe reproducirlos exactamente.
 
 ## 6. Liquidación
 
@@ -186,7 +200,7 @@ Todos están cubiertos por pruebas en `src/games/crash/domain/*.test.ts`:
 | --- | --- | --- |
 | 1 | Autoridad de settlement y duración del tick | ADR 0001 |
 | 2 | Fuente de entropía, compromiso y timeouts | ADR 0002 |
-| 3 | `houseEdgeBps` (propuesto 300), `growthPpm` (propuesto 24_000), `maxMultiplier` (propuesto 100x) | Esta spec, tras revisar riesgo |
+| 3 | ~~Parámetros económicos~~: resuelto con v1 para devnet (§5.1). Pendiente: revisión de riesgo antes de mainnet | Riesgo |
 | 4 | Valores de `BetLimits` por activo | Spec del house bank (pendiente) |
 | 5 | Apuestas durante `running` | Producto |
 | 6 | Cash-out forzado al alcanzar `maxPayout` | Producto + riesgo |
