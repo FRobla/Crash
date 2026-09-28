@@ -1,5 +1,96 @@
 # Checklist
 
+## Iteración 7 — Cuentas de jugador, monedas y sesiones (ADR 0003)
+
+Iniciada el 2026-09-28. Decisiones del usuario: opción A (saldo on-chain + clave de sesión), nombre de usuario on-chain, el nivel dará ventajas en el futuro, sin comisión de compra/venta, chat con base de datos (ADR aparte).
+
+### 1. Decisión (spec-first)
+- [x] ADR 0003 redactado (propuesto)
+- [ ] Aceptación del usuario y respuesta a las preguntas abiertas del ADR
+- [ ] Spec del programa v2: `Player`, `Username`, sesiones, apuesta embebida, invariantes, validación de cuentas y firmantes
+- [ ] Spec de progresión (`PROGRESSION_V1`) con vectores
+- [ ] ADR del backend del chat (base de datos, hosting, WebSockets)
+
+---
+
+## Iteración 6 — Despliegue en devnet y prueba end-to-end con Switchboard real
+
+Iniciada el 2026-09-28. El usuario elige `3R48JPhp8zkRokLdGJx8rFDT53CiKz92BYJErkipzpqV` (keypair de la CLI en WSL, solo devnet) como autoridad de upgrade, admin y operador.
+
+### 1. Despliegue
+- [x] `anchor build` limpio y `.so` idéntico al que se despliega (hash)
+- [x] Saldo suficiente; `solana program deploy` con el keypair del programa (fuera del repo)
+- [x] Verificar on-chain: autoridad de upgrade = `3R48…` y binario desplegado = local (hash)
+
+### 2. End-to-end (cliente desechable fuera del repo)
+- [x] `initialize_house` con límites pequeños de devnet; `deposit_bank`
+- [x] `create_randomness_account` contra el Switchboard real (authority = PDA)
+- [x] Ronda completa: `open_round` → `place_bet` → `close_betting` (commit real) → `start_round` (reveal real con payload del gateway) → `cash_out` → `reveal` → `settle_bet` → `close_bet`
+- [x] Verificación independiente del crash point (fuera del programa) a partir de `seed`, `vrf_output`, `round_id` y `program_id`
+- [x] Compute units reales de `close_betting` y `start_round`
+- [x] Varias rondas para detectar fallos intermitentes
+
+### 3. Seguridad
+- [x] Ninguna clave privada impresa ni en el repo; la semilla de cada ronda no se muestra antes de `reveal`
+- [x] Fondos del bank limitados al mínimo necesario en devnet
+
+### 4. Documentación
+- [x] Resultados en la spec del programa (§13) y en el spike (fase 3)
+- [x] `CLAUDE.md` — program id desplegado en devnet y autoridad
+- [x] `changelog.md` — entrada de la iteración 6
+
+### 5. Pendiente (decisión del usuario)
+- [ ] ¿Ampliar `entropy_timeout_slots` (hoy 150) tras las 2 anulaciones por caídas del gateway? Se aplica con `update_config`, sin redesplegar
+
+---
+
+## Iteración 5 — Integración de Switchboard en el programa
+
+Iniciada el 2026-09-28. El usuario acepta la propuesta de cierre de ADR 0002: Switchboard On-Demand, authority PDA, commit/reveal por CPI sin permisos y void sin permisos de rondas atascadas en `Betting`.
+
+### 1. Decisiones y spec (spec-first)
+- [x] ADR 0002 → aceptado
+- [x] Spec del programa: cuenta de randomness de la casa, `create_randomness_account`, CPI de commit en `close_betting`, CPI de reveal en `start_round`, void sin permisos en `Betting`, validación de cuentas (§8), amenazas (§9), decisión 1 (§12)
+
+### 2. Adaptador de Switchboard (sin añadir el crate)
+- [x] `switchboard.rs`: program id fijado (devnet), discriminadores, lectura de la cuenta con owner + discriminador + longitud, builders de init/commit/reveal
+- [x] Prueba: los builders coinciden con el IDL on-chain fijado (`tests/fixtures/switchboard-randomness-idl.json`)
+- [x] Prueba: el parser lee la cuenta real de devnet (`tests/fixtures/switchboard-randomness-account-devnet.hex`)
+
+### 3. Programa
+- [x] `HouseConfig`: cuenta de randomness y bump de la authority PDA; `Round`: cuenta y `seed_slot`
+- [x] `create_randomness_account` (admin, sin ronda activa): CPI de `randomness_init` firmada por la PDA; verificación posterior
+- [x] `open_round` exige cuenta de randomness configurada
+- [x] `close_betting`: CPI de `randomness_commit`; guarda cuenta y `seed_slot`
+- [x] `start_round`: CPI de `randomness_reveal`, owner/cuenta/`seed_slot`/`reveal_slot` verificados, `slot ≤ entropy_deadline_slot`; → `Running`
+- [x] `void_round`: sin permisos en `Betting` tras `betting_end_slot + entropy_timeout_slots`
+- [x] Evento `RoundStarted`
+
+### 4. Pruebas
+- [x] Programa mock de Switchboard solo para pruebas (mismo IDL, sin verificación de firma del oráculo), cargado en LiteSVM en el PID de devnet
+- [x] Sustituir `force_running` por el flujo real commit → reveal
+- [x] Adversariales: cuenta de randomness ajena, programa de Switchboard falso, cuenta con owner falso, `seed_slot` de otra ronda, reveal tras el deadline, doble `start_round`
+- [x] Void sin permisos en `Betting`
+- [x] Compute units de `close_betting` y `start_round` (LiteSVM con el mock: 15 091 y 58 062; con el coste real de devnet, commit 15 109 y reveal 41 934, ambas < 200 000)
+
+### 5. Verificación
+- [x] `anchor build`, `cargo test`, `cargo clippy`, `cargo fmt --check`
+- [x] `corepack pnpm test`, `lint`, `typecheck`
+
+### 6. Revisión de seguridad
+- [x] Checklist §8 de la spec aplicada a las instrucciones nuevas
+- [x] El mock nunca se despliega ni entra en el binario del programa
+- [x] Sin claves ni secretos en fixtures (solo datos públicos de devnet)
+
+### 7. Documentación
+- [x] `CLAUDE.md` — estructura y comandos (mock)
+- [x] `changelog.md` — entrada de la iteración 5
+
+### 8. Pendiente (siguiente iteración)
+- [x] Prueba end-to-end en devnet contra el Switchboard real — hecha en la iteración 6
+
+---
+
 ## Iteración 4 — Spike VRF en devnet (fase 2)
 
 Iniciada el 2026-09-28. La wallet de desarrollo del usuario es `DUfBEagYErLiFnBk16QjR94pJJ3zPe1eQnTRHtfZQwZ4` (10.1 SOL de devnet). El usuario transfiere SOL al keypair de la CLI en WSL (`3R48JPhp8zkRokLdGJx8rFDT53CiKz92BYJErkipzpqV`); ninguna clave privada pasa por el chat.
@@ -58,7 +149,7 @@ Iniciada el 2026-09-28. El usuario aprueba la spec del programa y las propuestas
 
 ### 5. Spike VRF (fuera del repo, desechable)
 - [x] Compatibilidad de crates de ORAO y Switchboard con Anchor 1.2
-- [ ] Medición en devnet — **bloqueada**: el faucet rechazó el airdrop (límite de peticiones); requiere fondear la dirección de desarrollo
+- [x] Medición en devnet — hecha en la iteración 4 (aquí quedó bloqueada por el límite del faucet; el usuario fondeó la dirección de desarrollo)
 - [x] Resultados en `docs/spikes/vrf-devnet.md`
 
 ### 6. Verificación

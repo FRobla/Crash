@@ -15,6 +15,11 @@ pub struct BankWithdrawn {
 }
 
 #[event]
+pub struct RandomnessAccountSet {
+    pub randomness_account: Pubkey,
+}
+
+#[event]
 pub struct RoundOpened {
     pub round_id: u64,
     pub commit: [u8; 32],
@@ -33,7 +38,17 @@ pub struct BetPlaced {
 #[event]
 pub struct BettingClosed {
     pub round_id: u64,
+    pub randomness_account: Pubkey,
+    pub randomness_seed_slot: u64,
     pub entropy_deadline_slot: u64,
+}
+
+#[event]
+pub struct RoundStarted {
+    pub round_id: u64,
+    pub vrf_output: [u8; 32],
+    pub start_slot: u64,
+    pub reveal_deadline_slot: u64,
 }
 
 #[event]

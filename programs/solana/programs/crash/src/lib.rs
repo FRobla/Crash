@@ -7,6 +7,7 @@ pub mod events;
 pub mod instructions;
 pub mod randomness;
 pub mod state;
+pub mod switchboard;
 pub mod vault;
 
 use anchor_lang::prelude::*;
@@ -50,6 +51,13 @@ pub mod crash {
         house::handle_withdraw_bank(ctx, amount)
     }
 
+    pub fn create_randomness_account(
+        ctx: Context<CreateRandomnessAccount>,
+        recent_slot: u64,
+    ) -> Result<()> {
+        house::handle_create_randomness_account(ctx, recent_slot)
+    }
+
     pub fn open_round(ctx: Context<OpenRound>, commit: [u8; 32]) -> Result<()> {
         round::handle_open_round(ctx, commit)
     }
@@ -67,8 +75,13 @@ pub mod crash {
         round::handle_close_betting(ctx)
     }
 
-    pub fn start_round(ctx: Context<StartRound>) -> Result<()> {
-        round::handle_start_round(ctx)
+    pub fn start_round(
+        ctx: Context<StartRound>,
+        signature: [u8; 64],
+        recovery_id: u8,
+        value: [u8; 32],
+    ) -> Result<()> {
+        round::handle_start_round(ctx, signature, recovery_id, value)
     }
 
     pub fn cash_out(ctx: Context<CashOut>) -> Result<()> {

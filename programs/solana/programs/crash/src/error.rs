@@ -56,8 +56,14 @@ pub enum CrashError {
     DeadlineNotReached,
     #[msg("Only the operator can do this in the current phase")]
     OperatorRequired,
-    #[msg("No entropy provider is configured yet (pending the VRF spike)")]
-    EntropyProviderNotConfigured,
+    #[msg("The house randomness account is not configured")]
+    RandomnessNotConfigured,
+    #[msg("The randomness account is not a Switchboard account controlled by this program")]
+    InvalidRandomnessAccount,
+    #[msg("The randomness does not belong to this round's commit or was not just revealed")]
+    StaleRandomness,
+    #[msg("The entropy deadline has passed; only void applies")]
+    EntropyDeadlinePassed,
     #[msg("Arithmetic overflow")]
     ArithmeticOverflow,
     #[msg("Rules error")]

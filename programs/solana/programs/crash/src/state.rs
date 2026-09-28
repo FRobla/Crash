@@ -38,8 +38,11 @@ pub struct HouseConfig {
     pub paused: bool,
     pub next_round_id: u64,
     pub current_round: Option<u64>,
+    /// Switchboard randomness account controlled by the `randomness_authority` PDA; default = unset.
+    pub randomness_account: Pubkey,
     pub bump: u8,
     pub vault_bump: u8,
+    pub randomness_authority_bump: u8,
 }
 
 /// Holds the bank and the stakes as lamports; `reserved_exposure` covers every active bet.
@@ -71,6 +74,9 @@ pub struct Round {
     pub opened_slot: u64,
     pub betting_end_slot: u64,
     pub entropy_deadline_slot: u64,
+    /// Switchboard account and commit slot fixed by `close_betting`; `start_round` must match them.
+    pub randomness_account: Pubkey,
+    pub randomness_seed_slot: u64,
     pub start_slot: u64,
     pub reveal_deadline_slot: u64,
     pub vrf_output: [u8; 32],

@@ -1,11 +1,10 @@
 # ADR 0002 — Fuente de randomness y ciclo provably fair
 
-- Estado: **aceptado parcialmente** el 2026-09-28.
-  - Aceptados: el esquema C y la regla `forfeit`.
-  - Pendiente: el proveedor VRF, que se elegirá tras el [spike en devnet](../spikes/vrf-devnet.md).
-  - No se implementa ningún proveedor hasta cerrar el spike.
+- Estado: **aceptado** el 2026-09-28.
+  - Esquema C y regla `forfeit`: aceptados en la primera revisión.
+  - Proveedor y diseño de integración: aceptados tras el [spike en devnet](../spikes/vrf-devnet.md) (sección «Decisión final»).
 - Fecha: 2026-09-28
-- Relacionado: [ADR 0001](0001-settlement-authority.md), [spec de reglas de ronda](../specs/crash-round-rules.md)
+- Relacionado: [ADR 0001](0001-settlement-authority.md), [spec de reglas de ronda](../specs/crash-round-rules.md), [spec del programa](../specs/crash-program.md)
 
 ## Contexto
 
@@ -56,7 +55,7 @@ Hash candidato: SHA-256. Se elige por su disponibilidad como syscall barato en S
 | --- | --- | --- |
 | Predicción por jugadores | Requiere conocer `s` antes de revelarse | Secreto de `s`; se exige que nunca se registre ni aparezca en logs |
 | Elección del resultado por el operador | `s` está comprometido antes de conocer `e` | Verificación `H(tag ‖ s) = commit` |
-| Sesgo del proveedor VRF | La prueba VRF es verificable; el proveedor no conoce `s` | Riesgo residual: colusión proveedor + operador |
+| Sesgo del proveedor VRF | El proveedor no conoce `s`; con Switchboard, on-chain solo se verifica la firma del oráculo (TEE), no una prueba VRF | Riesgo residual: integridad del TEE y colusión oráculo + operador (decisión final, punto 5) |
 | **No revelación selectiva** | El operador ve los cash-outs y conoce el resultado; si le es desfavorable, podría no revelar | **Una no revelación tras empezar la ronda no puede acabar en reembolso simple**, porque eso sería una opción gratuita para el operador. Regla penalizadora (`forfeit`): se liquida como si el crash point fuera el máximo y las apuestas sin cash-out se reembolsan. Invariante probado: para el house, el forfeit siempre es igual o peor que revelar |
 | Fallo del VRF antes de empezar | Nadie conoce el resultado | `void` con reembolso íntegro. Esto no da ventaja a nadie, porque sin `e` el operador tampoco conoce el resultado |
 | **Colusión operador–jugador** | El operador conoce el resultado durante la ronda y podría filtrarlo | **Riesgo residual principal.** Perjudica al house bank. Si el bank tiene financiadores externos, estos deben confiar en el operador. Mitigaciones futuras: custodiar `s` en TEE o con un umbral de firmantes; monitorizar retiros anómalamente cercanos al crash |
@@ -66,8 +65,8 @@ Hash candidato: SHA-256. Se elige por su disponibilidad como syscall barato en S
 
 ## Verificación independiente
 
-El verificador (página Fairness y código abierto) recibe `commit`, `s`, `e` junto con la prueba VRF, `program_id`, `round_id` y los parámetros de la ronda. Con ellos:
-1. comprueba el compromiso y la prueba VRF;
+El verificador (página Fairness y código abierto) recibe `commit`, `s`, `e` junto con la cuenta de randomness y el `seed_slot` de Switchboard, `program_id`, `round_id` y los parámetros de la ronda. Con ellos:
+1. comprueba el compromiso y que `e` coincide con el valor revelado on-chain por Switchboard para la cuenta y el `seed_slot` guardados en la ronda;
 2. recalcula `entropy` y, con `crashPointFromEntropy`, el crash point;
 3. recalcula la liquidación con `settleRound`.
 
@@ -86,20 +85,24 @@ Se aceptan:
 
 Siguen abiertas las preguntas 1 a 4. El spike resuelve la 1. La 3 se concreta en la spec del programa.
 
-## Propuesta de cierre (pendiente de aceptación)
+## Decisión final (aceptada el 2026-09-28)
 
-Se basa en los datos medidos en el [spike](../spikes/vrf-devnet.md) (100/100 rondas correctas en devnet, p95 de 28 slots, 10 000 lamports por ronda).
+Se basa en los datos medidos en el [spike](../spikes/vrf-devnet.md): 100/100 rondas correctas en devnet, p95 de 28 slots y 10 000 lamports por ronda.
 
-1. **Proveedor VRF:** Switchboard On-Demand. ORAO queda descartado porque no es compatible con Anchor 1.x.
-2. **Nueva regla de seguridad:** la cuenta de randomness de la casa tiene como authority una **PDA del programa**. El motivo es que Switchboard exige esa firma para el reveal, y el payload del reveal lo puede obtener cualquiera. Si la authority fuese el operador, conocería `e` (y con ello el crash point) antes que nadie y podría dejar la ronda sin empezar para forzar un reembolso. Con la PDA, `close_betting` hace la CPI de commit y `start_round` hace la CPI de reveal; las dos son sin permisos, así que cualquier jugador puede empezar la ronda.
-3. **Liveness:** si la ronda sigue en `Betting` pasado `betting_end_slot + entropy_timeout_slots`, cualquiera puede anularla. Hoy solo puede el operador.
-4. **Supuesto de confianza residual:** además de lo ya aceptado (el operador conoce el resultado durante la ronda), se confía en la integridad del TEE y del oráculo de Switchboard. Su salida no es una prueba VRF verificable matemáticamente.
+1. **Proveedor: Switchboard On-Demand** (randomness commit/reveal). ORAO queda descartado porque no es compatible con Anchor 1.x.
+2. **La authority de la cuenta de randomness de la casa es una PDA del programa.** Switchboard exige esa firma para `randomness_init`, `randomness_commit` y `randomness_reveal`, y el payload del reveal lo puede obtener cualquiera del gateway. Si la authority fuese el operador, conocería `e` (y con ello el crash point) antes que nadie y podría dejar la ronda sin empezar para forzar un reembolso. Con la PDA:
+   - la cuenta se crea con una instrucción del admin que hace la CPI de `randomness_init`;
+   - `close_betting` hace la CPI de `randomness_commit`;
+   - `start_round` hace la CPI de `randomness_reveal` y lee el valor en la misma instrucción;
+   - `close_betting` y `start_round` son sin permisos: cualquier jugador o vigilante puede empezar la ronda con el payload público.
+3. **Liveness:** si la ronda sigue en `Betting` pasado `betting_end_slot + entropy_timeout_slots`, cualquiera puede anularla. Antes de ese slot solo puede el operador.
+4. **Integración sin el crate de Switchboard:** el programa construye las tres CPIs y lee la cuenta con un adaptador propio y mínimo. El crate arrastra dependencias (p. ej. `libsecp256k1`) que el programa no necesita y no trae CPI de reveal. El adaptador se prueba contra el IDL on-chain fijado, contra una cuenta real de devnet y contra un mock en LiteSVM.
+5. **Supuesto de confianza residual:** además de lo ya aceptado (el operador conoce el resultado durante la ronda), se confía en la integridad del TEE y del oráculo de Switchboard. On-chain se verifica la firma secp256k1 del oráculo, pero su salida **no es una prueba VRF verificable matemáticamente por terceros**. El oráculo solo no puede calcular el crash point porque no conoce `s`. En colusión con el operador, sí: el oráculo podría negarse a revelar cuando el resultado fuese desfavorable para la casa y forzar un `void` con reembolso. Queda declarado como riesgo residual; un indicador vigilable es la tasa de rondas anuladas por timeout de entropía.
+6. **Riesgo de liveness aceptado:** quien ejecute `close_betting` elige el oráculo de la cola (Switchboard valida que pertenezca a ella). Un oráculo caído solo provoca un `void` con reembolso íntegro tras el timeout; nadie obtiene ventaja económica.
 
-Con esta propuesta, la pregunta 1 queda resuelta y la 3 se concreta en `entropy_timeout_slots = 150`. La 2 se resuelve con un compromiso por ronda.
+## Preguntas resueltas
 
-## Preguntas abiertas
-
-1. Proveedor VRF: Switchboard On-Demand u ORAO. Hay que medir en devnet latencia, coste y disponibilidad.
-2. ¿Hash chain o compromiso independiente por ronda?
-3. Timeouts concretos, en slots: cumplimiento del VRF, revelación y liquidación.
-4. ¿Es aceptable el riesgo de colusión para el MVP, o se exige desde el inicio custodia de `s` en TEE o por umbral?
+1. Proveedor VRF: **Switchboard On-Demand** (decisión final, punto 1).
+2. Hash chain o compromiso por ronda: **compromiso independiente por ronda** para el MVP. La hash chain queda como mejora opcional.
+3. Timeouts en slots: `betting_slots = 25`, `entropy_timeout_slots = 150` (5x el máximo medido), `reveal_grace_slots = 150`. Configurables en `HouseConfig`.
+4. Riesgo de colusión: **aceptado para el MVP en devnet**. Antes de fondos reales se reevalúa la custodia de `s` en TEE o por umbral.

@@ -36,12 +36,14 @@ Anchor no soporta Windows de forma nativa. El toolchain vive en **WSL `Ubuntu-24
 - `solana config get` debe apuntar a `https://api.devnet.solana.com`. El keypair de WSL (`~/.config/solana/id.json`) es **solo de desarrollo**: vive fuera del repo, nunca se commitea ni se usa con fondos reales.
 - El repo está en `/mnt/c/...`. Compilar Rust sobre el sistema de archivos de Windows es lento; si molesta, clona el repo dentro de WSL.
 - Workspace Anchor en `programs/solana/` (spec: `docs/specs/crash-program.md`). `rust-toolchain.toml` fija rustc **1.98.1** para pruebas e IDL (LiteSVM 0.17/Agave 4.3 exige ≥ 1.97.1); el `.so` lo compila platform-tools (SBPF v3). LiteSVM 0.10 —el que trae la plantilla de Anchor 1.2— no carga SBPF v3: usa 0.17.
+- **Desplegado en devnet** (2026-09-28): programa `384CfvvBXN52P4vga71WS7VUT9wv1HtB7YTR3UYLtZK4`. La autoridad de upgrade, admin y operador es el keypair de la CLI de WSL (`3R48JPhp8zkRokLdGJx8rFDT53CiKz92BYJErkipzpqV`, solo devnet). La cuenta de randomness de Switchboard de la casa es `EfdNfj2bMPdgt75k1cBYrzxCczp3ixd43ywuWuF8zRbL` (authority: PDA `kCywknKJWMH4H7jnNUPodPsM4KRQLkA2tqhE8QDZNRg`). Para actualizar: `anchor build` y `solana program deploy "$CARGO_TARGET_DIR/deploy/crash.so" --program-id "$CARGO_TARGET_DIR/deploy/crash-keypair.json"`. Cambiar el layout de `HouseConfig`, `Round` o `Bet` rompe las cuentas ya creadas: exige migración o casa nueva.
 - Usa `CARGO_TARGET_DIR="$HOME/.cache/crashit/target"` (fuera de `/mnt/c`, mucho más rápido). El keypair del programa queda en `$CARGO_TARGET_DIR/deploy/crash-keypair.json`, nunca en el repo; en otra máquina, `anchor keys sync` genera uno nuevo y actualiza `declare_id!`/`Anchor.toml`.
 
 | Tarea (dentro de WSL, en `programs/solana/`) | Comando |
 | --- | --- |
+| Compilar el mock de Switchboard (solo pruebas; antes de `anchor build`, que también compila las pruebas) | `cargo build-sbf --manifest-path test-programs/switchboard-mock/Cargo.toml --sbf-out-dir "$CARGO_TARGET_DIR/deploy"` |
 | Compilar el programa (+ IDL) | `anchor build` |
-| Todas las pruebas Rust (reglas puras + LiteSVM; requieren `anchor build` previo) | `cargo test` |
+| Todas las pruebas Rust (reglas puras + adaptador de Switchboard + LiteSVM; requieren los dos `.so` anteriores) | `cargo test` |
 | Solo la lógica pura contra los vectores | `cargo test -p crash-rules` |
 
 Las pruebas viven junto al código (`*.test.ts[x]` bajo `src/`). Vitest no soporta Server Components `async`; esos se cubrirán con pruebas E2E cuando existan.
@@ -62,6 +64,8 @@ src/
 programs/solana/        # Workspace Anchor (Rust); fuera de src/ y del toolchain JS
   crates/crash-rules/   # Reglas puras en Rust (no_std, sin Anchor); reproducen los vectores de TS exactamente
   programs/crash/       # Programa on-chain: autoridad de apuestas, cash-outs y liquidación (tests LiteSVM)
+                        #   src/switchboard.rs: adaptador mínimo de Switchboard On-Demand (sin su crate)
+  test-programs/switchboard-mock/  # SOLO PRUEBAS: stand-in de Switchboard en LiteSVM; nunca se despliega
 docs/
   specs/                # Especificaciones (spec-first): reglas de ronda y programa on-chain
     vectors/            # Vectores de referencia generados por el motor (TS ↔ Rust ↔ verificadores)
@@ -75,7 +79,7 @@ docs/
 Límites de dependencias:
 - `games/*` y `platform/*` no importan de `chain-adapters/*`. La composición ocurre en `src/app` (p. ej., `app/(dashboard)/layout.tsx` inyecta los componentes de Solana en los slots del shell).
 - `chain-adapters/*` puede depender de puertos y UI de `platform/*`, nunca al revés.
-- Las reglas de Crash ya viven en `src/games/crash/domain/`. La autoridad de settlement es un programa Anchor (ADR 0001, aceptado) especificado en `docs/specs/crash-program.md` (pendiente de aprobación); randomness usa el esquema de ADR 0002 con proveedor VRF pendiente del spike. No crees carpetas vacías por adelantado.
+- Las reglas de Crash ya viven en `src/games/crash/domain/`. La autoridad de settlement es un programa Anchor (ADR 0001, aceptado) especificado en `docs/specs/crash-program.md` (aprobada v1.1); randomness usa el esquema C de ADR 0002 (aceptado) con Switchboard On-Demand y una PDA del programa como authority. El program id de Switchboard está fijado al de devnet en `switchboard.rs`. ADR 0003 (propuesto) define saldo de jugador on-chain en una PDA `Player`, monedas (1 moneda = 10⁶ lamports), claves de sesión, nombre de usuario y experiencia on-chain; hasta que se acepte y exista la spec v2 del programa, el código sigue el modelo actual de una cuenta `Bet` por apuesta. No crees carpetas vacías por adelantado.
 
 ## Producto
 

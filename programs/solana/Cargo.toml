@@ -2,6 +2,8 @@
 members = [
     "crates/*",
     "programs/*",
+    # Test-only programs (never deployed); built with `cargo build-sbf`, not `anchor build`.
+    "test-programs/*",
 ]
 resolver = "2"
 

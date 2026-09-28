@@ -1,6 +1,6 @@
 # Spike — Proveedor VRF en devnet
 
-- Estado: **completado** (2026-09-28). La recomendación está pendiente de que el usuario la acepte en ADR 0002.
+- Estado: **completado** (2026-09-28). Recomendación aceptada en ADR 0002 e integrada en el programa (spec del programa §6.1).
 - Fecha: 2026-09-28
 - Decide: la pregunta abierta 1 de [ADR 0002](../adr/0002-randomness-source.md) y la decisión 1 de la [spec del programa](../specs/crash-program.md).
 - Candidatos: **ORAO VRF** y **Switchboard On-Demand**.
@@ -101,6 +101,33 @@ Solo se midió una franja horaria; el método preveía dos. La cola de devnet pu
    - on-chain se verifica la firma secp256k1 del signer activo del oráculo (campos `oracle` y `activeSecp256K1Signer` de la cuenta);
    - **no es una prueba VRF verificable matemáticamente por terceros**, así que se confía en la integridad del TEE y en que el oráculo no colabore con el operador;
    - la documentación pública no detalla la atestación ni las penalizaciones.
+
+### Fase 3 — Integración end-to-end con el programa desplegado (2026-09-28)
+
+**Configuración:**
+- Programa `384CfvvBXN52P4vga71WS7VUT9wv1HtB7YTR3UYLtZK4` desplegado en devnet desde `3R48…`, que es autoridad de upgrade, admin y operador. El binario on-chain coincide con el local (SHA-256).
+- Cuenta de randomness de la casa `EfdNfj2bMPdgt75k1cBYrzxCczp3ixd43ywuWuF8zRbL`, creada con `create_randomness_account`. Su authority es la PDA `kCywknKJWMH4H7jnNUPodPsM4KRQLkA2tqhE8QDZNRg`.
+- Cliente desechable fuera del repo y jugador de devnet desechable. Límites pequeños: stake 0.002 SOL; bank de 0.25 SOL.
+- Cada ronda recorre `open_round` → `place_bet` (cash-out manual o auto a 1.50x, alternando) → `close_betting` (commit real) → `start_round` (reveal real con el payload del gateway) → `cash_out` → `reveal` → `settle_bet` → `close_bet`.
+- Un **verificador independiente en JS**, sin el código del programa, recalcula el crash point con `seed`, `vrf_output`, `round_id` y `program_id`, y también el pago.
+
+| Métrica | Resultado |
+| --- | --- |
+| Rondas | 25 intentos: **23 completas**, **2 anuladas** por liveness (reembolso íntegro, como exige la spec) |
+| Crash point y pago | **23/23 coinciden** con el verificador independiente (crash points de 1.00x a 23.05x; cash-outs manuales, autos ganadores y perdedores) |
+| `seed_slot` | Siempre `slot_de_close_betting − 1` |
+| Latencia commit → inicio de ronda | mín. 17 · p50 19 · p95 22 · máx. 24 slots |
+| Compute units | `close_betting` 27 775–28 057; `start_round` 98 605–103 105; `create_randomness_account` 113 276. Todas por debajo del límite por defecto de 200 000 |
+| Operador revelando por su cuenta | **Rechazado por Switchboard** (`ConstraintHasOne` sobre `authority`); la cuenta quedó sin revelar |
+
+**Anulaciones por liveness (hallazgo):**
+- **Ronda 3:** el gateway del oráculo asignado (`2NpN5…`, el mismo de las rondas correctas) respondió HTTP 500 durante toda la ventana de `entropy_timeout_slots = 150`. `start_round` fue rechazado con `EntropyDeadlinePassed`; se anuló sin permisos y se reembolsó el stake.
+- **Ronda 4** (la prueba adversarial, sin apuestas): la ronda no llegó a iniciarse dentro de la ventana. El script no registró la causa. Unos 2 000 slots después, el gateway del oráculo `Hdu1…` respondía y una simulación del reveal pasaba la verificación de Switchboard. Eso apunta a otra caída temporal del gateway, no a un problema de firma.
+- Tras la ronda 4 se hicieron 20 rondas seguidas sin ningún error de gateway.
+- En la fase 2 hubo 0 fallos en 100 rondas. Con la fase 3, la tasa observada es de 2 fallos en 125 rondas (1.6 %), dentro del umbral del 2 % del criterio de descarte, pero muy cerca.
+- Consecuencias para el diseño:
+  - la seguridad se mantiene (nadie obtiene ventaja y los stakes vuelven íntegros), pero la liveness depende del gateway de Switchboard;
+  - un valor revelado sigue siendo aceptado por Switchboard mucho después de los 150 slots, así que **ampliar `entropy_timeout_slots` reduciría las anulaciones** sin dar ventaja a nadie, a cambio de que los jugadores esperen más en el peor caso. Es configurable con `update_config`, sin redesplegar.
 
 ## Recomendación
 

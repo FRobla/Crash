@@ -1,17 +1,18 @@
 //! LiteSVM tests of the Crash program (docs/specs/crash-program.md §7–§10).
 //!
-//! `start_round` is blocked until the VRF provider is chosen, so the `running` phase is reached by
-//! writing the round account directly (`force_running`). That shortcut exists only in tests.
+//! Switchboard is replaced by the test-only mock in `test-programs/switchboard-mock`, loaded at the
+//! devnet program id. It runs the same commit/reveal account checks but lets the test choose the
+//! revealed value; the oracle signature is only verified by the real program on devnet.
 
 use {
     anchor_lang::{
         prelude::Pubkey,
         solana_program::{instruction::Instruction, system_program},
-        AccountDeserialize, AccountSerialize, InstructionData, ToAccountMetas,
+        AccountDeserialize, InstructionData, ToAccountMetas,
     },
     crash::{
-        error::CrashError, randomness, Bet, BetOutcome, HouseConfig, HouseVault, Limits, Round,
-        RoundPhase, Timeouts,
+        error::CrashError, randomness, switchboard, Bet, BetOutcome, HouseConfig, HouseVault,
+        Limits, Round, RoundPhase, Timeouts,
     },
     litesvm::LiteSVM,
     solana_instruction_error::InstructionError,
@@ -38,10 +39,24 @@ const MAX_BETS: u32 = 256;
 const RULES: crash_rules::Rules = crash_rules::CRASH_RULES_V1;
 const VRF_OUTPUT: [u8; 32] = [7; 32];
 
+/// Stand-ins for Switchboard's queue and oracle; the mock only compares them with what it stored.
+const QUEUE: Pubkey = Pubkey::new_from_array([0xA1; 32]);
+const ORACLE: Pubkey = Pubkey::new_from_array([0xA2; 32]);
+
 struct Harness {
     svm: LiteSVM,
     admin: Keypair,
     operator: Keypair,
+    randomness: Pubkey,
+}
+
+fn randomness_authority_pda() -> Pubkey {
+    pda(&[crash::RANDOMNESS_AUTHORITY_SEED])
+}
+
+fn deployed(name: &str) -> Vec<u8> {
+    let path = format!("{}/../deploy/{name}.so", env!("CARGO_TARGET_TMPDIR"));
+    std::fs::read(&path).unwrap_or_else(|_| panic!("{path} missing: build it first (CLAUDE.md)"))
 }
 
 fn pda(seeds: &[&[u8]]) -> Pubkey {
@@ -77,10 +92,24 @@ fn custom(error: CrashError) -> u32 {
 }
 
 impl Harness {
+    /// House initialized and its randomness account created, as on devnet.
     fn new() -> Self {
+        let mut harness = Self::without_randomness();
+        let randomness = Keypair::new();
+        let admin = harness.admin.insecure_clone();
+        harness.send_ok(
+            harness.create_randomness_ix(&admin.pubkey(), &randomness.pubkey()),
+            &[&admin, &randomness],
+        );
+        harness.randomness = randomness.pubkey();
+        harness
+    }
+
+    fn without_randomness() -> Self {
         let mut svm = LiteSVM::new();
-        let bytes = include_bytes!(concat!(env!("CARGO_TARGET_TMPDIR"), "/../deploy/crash.so"));
-        svm.add_program(crash::ID, bytes).unwrap();
+        svm.add_program(crash::ID, &deployed("crash")).unwrap();
+        svm.add_program(switchboard::PROGRAM_ID, &deployed("switchboard_mock"))
+            .unwrap();
         let admin = Keypair::new();
         let operator = Keypair::new();
         svm.airdrop(&admin.pubkey(), 10_000 * SOL).unwrap();
@@ -97,6 +126,7 @@ impl Harness {
             svm,
             admin,
             operator,
+            randomness: Pubkey::default(),
         };
         harness.send_ok(
             harness.initialize_ix(&harness.admin.pubkey()),
@@ -111,7 +141,8 @@ impl Harness {
         player
     }
 
-    fn send(&mut self, ix: Instruction, signers: &[&Keypair]) -> Result<(), u32> {
+    /// Compute units consumed on success, the custom error code on failure.
+    fn send(&mut self, ix: Instruction, signers: &[&Keypair]) -> Result<u64, u32> {
         let payer = signers[0].pubkey();
         let message =
             Message::new_with_blockhash(&[ix], Some(&payer), &self.svm.latest_blockhash());
@@ -119,9 +150,9 @@ impl Harness {
         let result = self.svm.send_transaction(tx);
         self.svm.expire_blockhash();
         match result {
-            Ok(_) => {
+            Ok(meta) => {
                 self.assert_solvent();
-                Ok(())
+                Ok(meta.compute_units_consumed)
             }
             Err(failure) => match failure.err {
                 TransactionError::InstructionError(_, InstructionError::Custom(code)) => Err(code),
@@ -130,10 +161,9 @@ impl Harness {
         }
     }
 
-    fn send_ok(&mut self, ix: Instruction, signers: &[&Keypair]) {
-        if let Err(code) = self.send(ix, signers) {
-            panic!("transaction failed with custom error {code}");
-        }
+    fn send_ok(&mut self, ix: Instruction, signers: &[&Keypair]) -> u64 {
+        self.send(ix, signers)
+            .unwrap_or_else(|code| panic!("transaction failed with custom error {code}"))
     }
 
     fn expect_err(&mut self, ix: Instruction, signers: &[&Keypair], error: CrashError) {
@@ -293,24 +323,103 @@ impl Harness {
         )
     }
 
+    fn create_randomness_ix(&self, admin: &Pubkey, randomness: &Pubkey) -> Instruction {
+        self.create_randomness_ix_with(admin, randomness, &switchboard::PROGRAM_ID)
+    }
+
+    fn create_randomness_ix_with(
+        &self,
+        admin: &Pubkey,
+        randomness: &Pubkey,
+        switchboard_program: &Pubkey,
+    ) -> Instruction {
+        Instruction::new_with_bytes(
+            crash::ID,
+            &crash::instruction::CreateRandomnessAccount { recent_slot: 1 }.data(),
+            crash::accounts::CreateRandomnessAccount {
+                admin: *admin,
+                config: config_pda(),
+                randomness: *randomness,
+                randomness_authority: randomness_authority_pda(),
+                reward_escrow: Pubkey::new_unique(),
+                queue: QUEUE,
+                program_state: Pubkey::new_unique(),
+                lut_signer: Pubkey::new_unique(),
+                lut: Pubkey::new_unique(),
+                system_program: system_program::ID,
+                token_program: switchboard::TOKEN_PROGRAM,
+                associated_token_program: switchboard::ASSOCIATED_TOKEN_PROGRAM,
+                wrapped_sol_mint: switchboard::WRAPPED_SOL_MINT,
+                address_lookup_table_program: switchboard::ADDRESS_LOOKUP_TABLE_PROGRAM,
+                switchboard_program: *switchboard_program,
+            }
+            .to_account_metas(None),
+        )
+    }
+
     fn close_betting_ix(&self, round_id: u64) -> Instruction {
+        self.close_betting_ix_with(round_id, &self.randomness, &switchboard::PROGRAM_ID)
+    }
+
+    fn close_betting_ix_with(
+        &self,
+        round_id: u64,
+        randomness: &Pubkey,
+        switchboard_program: &Pubkey,
+    ) -> Instruction {
         Instruction::new_with_bytes(
             crash::ID,
             &crash::instruction::CloseBetting {}.data(),
             crash::accounts::CloseBetting {
                 config: config_pda(),
                 round: round_pda(round_id),
+                randomness: *randomness,
+                randomness_authority: randomness_authority_pda(),
+                queue: QUEUE,
+                oracle: ORACLE,
+                recent_slothashes: switchboard::SLOT_HASHES_SYSVAR,
+                switchboard_program: *switchboard_program,
             }
             .to_account_metas(None),
         )
     }
 
-    fn start_round_ix(&self, round_id: u64) -> Instruction {
+    fn start_round_ix(&self, payer: &Pubkey, round_id: u64, value: [u8; 32]) -> Instruction {
+        self.start_round_ix_with(payer, round_id, value, 0, &switchboard::PROGRAM_ID)
+    }
+
+    fn start_round_ix_with(
+        &self,
+        payer: &Pubkey,
+        round_id: u64,
+        value: [u8; 32],
+        recovery_id: u8,
+        switchboard_program: &Pubkey,
+    ) -> Instruction {
         Instruction::new_with_bytes(
             crash::ID,
-            &crash::instruction::StartRound {}.data(),
+            &crash::instruction::StartRound {
+                signature: [0; 64],
+                recovery_id,
+                value,
+            }
+            .data(),
             crash::accounts::StartRound {
+                config: config_pda(),
                 round: round_pda(round_id),
+                payer: *payer,
+                randomness: self.randomness,
+                randomness_authority: randomness_authority_pda(),
+                oracle: ORACLE,
+                queue: QUEUE,
+                stats: Pubkey::new_unique(),
+                reward_escrow: Pubkey::new_unique(),
+                program_state: Pubkey::new_unique(),
+                recent_slothashes: switchboard::SLOT_HASHES_SYSVAR,
+                system_program: system_program::ID,
+                token_program: switchboard::TOKEN_PROGRAM,
+                wrapped_sol_mint: switchboard::WRAPPED_SOL_MINT,
+                switchboard_program: *switchboard_program,
             }
             .to_account_metas(None),
         )
@@ -425,24 +534,28 @@ impl Harness {
         self.send_ok(self.close_betting_ix(round_id), &[&operator]);
     }
 
-    /// Test-only stand-in for `start_round` until the VRF provider is integrated.
-    fn force_running(&mut self, round_id: u64) -> u64 {
-        let address = round_pda(round_id);
-        let mut round: Round = self.fetch(&address);
-        let start_slot = self.slot() + 1;
+    /// Reveals `VRF_OUTPUT` through the Switchboard mock a couple of slots after the commit.
+    fn start_round(&mut self, round_id: u64) -> u64 {
+        let start_slot = self.slot() + 2;
         self.warp(start_slot);
-        round.phase = RoundPhase::Running;
-        round.vrf_output = VRF_OUTPUT;
-        round.start_slot = start_slot;
-        round.reveal_deadline_slot =
-            start_slot + RULES.horizon().unwrap() + TIMEOUTS.reveal_grace_slots;
-        let mut account = self.svm.get_account(&address).unwrap();
-        let mut data = Vec::with_capacity(account.data.len());
-        round.try_serialize(&mut data).unwrap();
-        data.resize(account.data.len(), 0);
-        account.data = data;
-        self.svm.set_account(address, account).unwrap();
+        let operator = self.operator.insecure_clone();
+        self.send_ok(
+            self.start_round_ix(&operator.pubkey(), round_id, VRF_OUTPUT),
+            &[&operator],
+        );
         start_slot
+    }
+
+    fn randomness_state(&self) -> switchboard::Randomness {
+        let account = self.svm.get_account(&self.randomness).unwrap();
+        switchboard::Randomness::parse(&account.owner, &account.data).expect("randomness account")
+    }
+
+    /// Overwrites a field of the randomness account, as a stand-in for a stale or foreign commit.
+    fn patch_randomness(&mut self, offset: usize, bytes: &[u8]) {
+        let mut account = self.svm.get_account(&self.randomness).unwrap();
+        account.data[offset..offset + bytes.len()].copy_from_slice(bytes);
+        self.svm.set_account(self.randomness, account).unwrap();
     }
 
     fn warp_to_tick(&mut self, round_id: u64, tick: u64) {
@@ -653,11 +766,6 @@ fn voided_round_refunds_exactly_and_closes_bets() {
         CrashError::BettingStillOpen,
     );
     h.close_betting(round_id);
-    h.expect_err(
-        h.start_round_ix(round_id),
-        &[&operator],
-        CrashError::EntropyProviderNotConfigured,
-    );
 
     let stranger = h.player();
     h.expect_err(
@@ -665,8 +773,14 @@ fn voided_round_refunds_exactly_and_closes_bets() {
         &[&stranger],
         CrashError::DeadlineNotReached,
     );
+    // Once the entropy deadline passes, the reveal can no longer start the round: only void applies.
     let round: Round = h.fetch(&round_pda(round_id));
     h.warp(round.entropy_deadline_slot + 1);
+    h.expect_err(
+        h.start_round_ix(&stranger.pubkey(), round_id, VRF_OUTPUT),
+        &[&stranger],
+        CrashError::EntropyDeadlinePassed,
+    );
     h.send_ok(h.void_ix(&stranger.pubkey(), round_id), &[&stranger]);
     assert_eq!(
         h.fetch::<Round>(&round_pda(round_id)).phase,
@@ -723,7 +837,7 @@ fn revealed_round_settles_exactly_like_the_rules() {
         h.bet(player, round_id, SOL, auto_cash_out);
     }
     h.close_betting(round_id);
-    h.force_running(round_id);
+    h.start_round(round_id);
 
     h.expect_err(
         h.cash_out_ix(&early.pubkey(), &early.pubkey(), round_id),
@@ -835,7 +949,7 @@ fn unrevealed_round_is_forfeited_in_favor_of_players() {
     h.bet(&auto, round_id, SOL, 50_000);
     h.bet(&holder, round_id, SOL, 0);
     h.close_betting(round_id);
-    h.force_running(round_id);
+    h.start_round(round_id);
     h.warp_to_tick(round_id, RULES.first_tick_at_least(30_000).unwrap());
     h.send_ok(
         h.cash_out_ix(&cashed.pubkey(), &cashed.pubkey(), round_id),
@@ -883,7 +997,7 @@ fn pause_never_blocks_exit_paths() {
     let player = h.player();
     h.bet(&player, round_id, SOL, 0);
     h.close_betting(round_id);
-    h.force_running(round_id);
+    h.start_round(round_id);
 
     let admin = h.admin.insecure_clone();
     h.send_ok(h.update_config_ix(MAX_BETS, true), &[&admin]);
@@ -902,4 +1016,206 @@ fn pause_never_blocks_exit_paths() {
         h.fetch::<Bet>(&bet_pda(round_id, &player.pubkey())).outcome,
         BetOutcome::CashedOut
     );
+}
+
+#[test]
+fn randomness_account_is_controlled_by_the_program_pda() {
+    let mut h = Harness::without_randomness();
+    let operator = h.operator.insecure_clone();
+    h.expect_err(
+        h.open_round_ix(&operator.pubkey(), 0, [1; 32]),
+        &[&operator],
+        CrashError::RandomnessNotConfigured,
+    );
+
+    let stranger = h.player();
+    let account = Keypair::new();
+    assert!(h
+        .send(
+            h.create_randomness_ix(&stranger.pubkey(), &account.pubkey()),
+            &[&stranger, &account]
+        )
+        .is_err());
+    let admin = h.admin.insecure_clone();
+    h.expect_err(
+        h.create_randomness_ix_with(&admin.pubkey(), &account.pubkey(), &Pubkey::new_unique()),
+        &[&admin, &account],
+        CrashError::InvalidRandomnessAccount,
+    );
+
+    h.send_ok(
+        h.create_randomness_ix(&admin.pubkey(), &account.pubkey()),
+        &[&admin, &account],
+    );
+    h.randomness = account.pubkey();
+    let config: HouseConfig = h.fetch(&config_pda());
+    assert_eq!(config.randomness_account, account.pubkey());
+    let state = h.randomness_state();
+    assert_eq!(state.authority, randomness_authority_pda());
+    assert_eq!(state.queue, QUEUE);
+
+    // No rotation while a round is active.
+    h.open_round([1; 32]);
+    let rotated = Keypair::new();
+    h.expect_err(
+        h.create_randomness_ix(&admin.pubkey(), &rotated.pubkey()),
+        &[&admin, &rotated],
+        CrashError::RoundStillActive,
+    );
+}
+
+#[test]
+fn round_starts_only_with_its_own_fresh_randomness() {
+    let mut h = Harness::new();
+    h.deposit(500 * SOL);
+    let round_id = h.open_round([1; 32]);
+    let player = h.player();
+    h.bet(&player, round_id, SOL, 0);
+    let round: Round = h.fetch(&round_pda(round_id));
+    h.warp(round.betting_end_slot);
+
+    let stranger = h.player();
+    // Starting requires the commit first: until then the round is bound to no randomness account.
+    h.expect_err(
+        h.start_round_ix(&stranger.pubkey(), round_id, VRF_OUTPUT),
+        &[&stranger],
+        CrashError::InvalidRandomnessAccount,
+    );
+    // Only the house account and the pinned Switchboard program are accepted.
+    h.expect_err(
+        h.close_betting_ix_with(round_id, &Pubkey::new_unique(), &switchboard::PROGRAM_ID),
+        &[&stranger],
+        CrashError::InvalidRandomnessAccount,
+    );
+    h.expect_err(
+        h.close_betting_ix_with(round_id, &h.randomness, &Pubkey::new_unique()),
+        &[&stranger],
+        CrashError::InvalidRandomnessAccount,
+    );
+
+    // Anyone may close betting; the commit binds the round to the account and seed slot.
+    let close_slot = h.slot();
+    h.send_ok(h.close_betting_ix(round_id), &[&stranger]);
+    let round: Round = h.fetch(&round_pda(round_id));
+    assert_eq!(round.phase, RoundPhase::AwaitingEntropy);
+    assert_eq!(round.randomness_account, h.randomness);
+    assert_eq!(round.randomness_seed_slot, close_slot - 1);
+    assert_eq!(h.randomness_state().seed_slot, close_slot - 1);
+
+    h.warp(close_slot + 2);
+    h.expect_err(
+        h.start_round_ix_with(
+            &stranger.pubkey(),
+            round_id,
+            VRF_OUTPUT,
+            0,
+            &Pubkey::new_unique(),
+        ),
+        &[&stranger],
+        CrashError::InvalidRandomnessAccount,
+    );
+    // A reveal that leaves the account without a value for this slot is rejected.
+    h.expect_err(
+        h.start_round_ix_with(
+            &stranger.pubkey(),
+            round_id,
+            VRF_OUTPUT,
+            switchboard_mock::NO_OP_RECOVERY_ID,
+            &switchboard::PROGRAM_ID,
+        ),
+        &[&stranger],
+        CrashError::StaleRandomness,
+    );
+    // A value committed to another seed slot is rejected.
+    let foreign_seed_slot = close_slot - 5;
+    h.patch_randomness(
+        switchboard::SEED_SLOT_OFFSET,
+        &foreign_seed_slot.to_le_bytes(),
+    );
+    h.expect_err(
+        h.start_round_ix(&stranger.pubkey(), round_id, VRF_OUTPUT),
+        &[&stranger],
+        CrashError::StaleRandomness,
+    );
+    h.patch_randomness(
+        switchboard::SEED_SLOT_OFFSET,
+        &(close_slot - 1).to_le_bytes(),
+    );
+
+    // Anyone can start the round with the public reveal payload.
+    let start_slot = h.slot();
+    h.send_ok(
+        h.start_round_ix(&stranger.pubkey(), round_id, VRF_OUTPUT),
+        &[&stranger],
+    );
+    let round: Round = h.fetch(&round_pda(round_id));
+    assert_eq!(round.phase, RoundPhase::Running);
+    assert_eq!(round.vrf_output, VRF_OUTPUT);
+    assert_eq!(round.start_slot, start_slot);
+    assert_eq!(
+        round.reveal_deadline_slot,
+        start_slot + RULES.horizon().unwrap() + TIMEOUTS.reveal_grace_slots
+    );
+    h.warp(start_slot + 1);
+    h.expect_err(
+        h.start_round_ix(&stranger.pubkey(), round_id, [9; 32]),
+        &[&stranger],
+        CrashError::InvalidPhase,
+    );
+}
+
+#[test]
+fn stuck_betting_round_can_be_voided_by_anyone_after_the_timeout() {
+    let mut h = Harness::new();
+    h.deposit(500 * SOL);
+    let round_id = h.open_round([1; 32]);
+    let player = h.player();
+    h.bet(&player, round_id, SOL, 0);
+
+    let round: Round = h.fetch(&round_pda(round_id));
+    let stuck_after = round.betting_end_slot + TIMEOUTS.entropy_timeout_slots;
+    let stranger = h.player();
+    h.warp(stuck_after);
+    h.expect_err(
+        h.void_ix(&stranger.pubkey(), round_id),
+        &[&stranger],
+        CrashError::OperatorRequired,
+    );
+    h.warp(stuck_after + 1);
+    h.send_ok(h.void_ix(&stranger.pubkey(), round_id), &[&stranger]);
+    assert_eq!(
+        h.fetch::<Round>(&round_pda(round_id)).phase,
+        RoundPhase::Voided
+    );
+    let before = h.lamports(&player.pubkey());
+    h.send_ok(
+        h.settle_ix(round_id, &player.pubkey(), &player.pubkey()),
+        &[&stranger],
+    );
+    assert_eq!(h.lamports(&player.pubkey()) - before, SOL);
+}
+
+/// Real Switchboard costs measured on devnet (docs/spikes/vrf-devnet.md).
+const DEVNET_COMMIT_CU: u64 = 15_109;
+const DEVNET_REVEAL_CU: u64 = 41_934;
+const DEFAULT_CU_LIMIT: u64 = 200_000;
+
+#[test]
+fn randomness_instructions_fit_the_default_compute_budget() {
+    let mut h = Harness::new();
+    h.deposit(500 * SOL);
+    let round_id = h.open_round([1; 32]);
+    let round: Round = h.fetch(&round_pda(round_id));
+    h.warp(round.betting_end_slot);
+    let operator = h.operator.insecure_clone();
+    let close = h.send_ok(h.close_betting_ix(round_id), &[&operator]);
+    h.warp(h.slot() + 2);
+    let start = h.send_ok(
+        h.start_round_ix(&operator.pubkey(), round_id, VRF_OUTPUT),
+        &[&operator],
+    );
+    println!("compute units with the mock: close_betting {close}, start_round {start}");
+    // The mock's own cost is included, so adding the real Switchboard cost is an upper bound.
+    assert!(close + DEVNET_COMMIT_CU < DEFAULT_CU_LIMIT);
+    assert!(start + DEVNET_REVEAL_CU < DEFAULT_CU_LIMIT);
 }

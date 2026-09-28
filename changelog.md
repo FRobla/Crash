@@ -111,3 +111,30 @@
   - el valor solo se puede leer en el mismo slot del reveal.
 
   El modelo de confianza (TEE + oráculo, sin prueba VRF matemática) queda declarado como riesgo residual.
+- **ADR 0002 aceptado** con Switchboard On-Demand. La cuenta de randomness de la casa tiene como authority una PDA del programa, así que ni el operador ni nadie puede revelar el valor fuera de `start_round`. Spec del programa → v1.1 (§6.1).
+- **`start_round` implementado con Switchboard** (iteración 5):
+  - nueva instrucción `create_randomness_account` (admin, sin ronda activa): crea o rota la cuenta de randomness por CPI firmada por la PDA;
+  - `close_betting` hace la CPI de commit y guarda en `Round` la cuenta y el `seed_slot`; `start_round` (sin permisos, con el payload público del gateway) hace la CPI de reveal y lee el valor en el mismo slot, exigiendo la misma cuenta, el mismo `seed_slot` y `reveal_slot = slot`;
+  - `open_round` exige cuenta de randomness configurada; `void_round` pasa a ser sin permisos en `Betting` tras `betting_end_slot + entropy_timeout_slots`;
+  - evento nuevo `RoundStarted`; `BettingClosed` incluye la cuenta y el `seed_slot`.
+  - **Compatibilidad:** cambian las cuentas `HouseConfig` y `Round` y los códigos de error. No hay despliegues previos afectados.
+- Integración sin el crate `switchboard-on-demand`: adaptador propio `programs/solana/programs/crash/src/switchboard.rs` con el program id de devnet fijado y comprobación de owner (el `parse` del crate no la hace). Se prueba contra el IDL on-chain y una cuenta real de devnet guardados en `tests/fixtures/` (solo datos públicos).
+- Nuevo programa **solo de pruebas** `programs/solana/test-programs/switchboard-mock`: replica el IDL de Switchboard en LiteSVM sin verificar la firma del oráculo. Sustituye al atajo `force_running`: las pruebas recorren ahora el flujo real commit → reveal. No se construye con `anchor build` ni puede desplegarse (su id es el de Switchboard).
+- Pruebas Rust: 32 en verde (13 LiteSVM, 6 del adaptador, 8 de propiedades, 5 de vectores); `clippy` sin avisos. Compute units con el mock: `close_betting` 15 091 y `start_round` 58 062; con el coste real de Switchboard ambas caben en el límite por defecto de 200 000.
+- **Sin verificar:** la integración con el programa real de Switchboard en devnet (firma del oráculo y cuentas auxiliares reales). Requiere desplegar el programa en devnet.
+- **Programa desplegado en devnet** (iteración 6): `384CfvvBXN52P4vga71WS7VUT9wv1HtB7YTR3UYLtZK4`, con `3R48…` (keypair de la CLI, solo devnet) como autoridad de upgrade, admin y operador. El binario on-chain coincide con el local. Casa inicializada con límites pequeños de devnet y cuenta de randomness de Switchboard `EfdNfj…` con authority PDA.
+- **Prueba end-to-end contra el Switchboard real:**
+  - 23 rondas completas, con crash point y pago idénticos a un verificador independiente;
+  - latencia p50 de 19 slots y máxima de 24;
+  - compute units reales: `close_betting` ≈ 28 000 y `start_round` ≈ 100 000;
+  - Switchboard rechaza el reveal firmado por el operador.
+- **Hallazgo de liveness:** 2 rondas se anularon porque el gateway de Switchboard no respondió dentro de `entropy_timeout_slots = 150`. El programa rechazó el inicio tardío y los stakes se reembolsaron íntegros. Queda abierta la decisión de ampliar ese timeout (configurable sin redesplegar). Detalle en `docs/spikes/vrf-devnet.md`, fase 3.
+- **ADR 0003 propuesto — [cuentas de jugador, monedas y sesiones](docs/adr/0003-player-accounts-and-sessions.md).** Todavía no hay código que dependa de él.
+  - El saldo del jugador vive on-chain, en una PDA `Player` separada del vault de la casa. Solo su dueño puede sacarlo, y solo hacia su wallet; la pausa no bloquea la venta.
+  - Monedas: 1 SOL = 1000 monedas, y la unidad base de la moneda es exactamente 1 lamport. Compra y venta 1:1, sin comisión, y el motor y los vectores de las reglas v1 no cambian.
+  - Las apuestas y los cash-outs siguen siendo transacciones verificables on-chain (ADR 0001 se mantiene), pero las firma una clave de sesión del navegador con permisos limitados (solo apostar, hacer cash-out o revocarse, con caducidad y tope de gasto). La wallet solo firma al registrarse y comprar, al abrir sesión y al vender.
+  - La apuesta en curso se guarda dentro de `Player` y desaparece la cuenta `Bet`. **Compatibilidad:** exigirá una spec v2 del programa y una casa nueva en devnet.
+  - El nombre de usuario es on-chain, único (PDA por nombre normalizado, `[a-z0-9_]`, 3–16 caracteres) y público para siempre. El admin solo puede resetear nombres.
+  - La experiencia es on-chain (`total_wagered`, solo en rondas `Crashed`), porque los niveles darán ventajas económicas. Cualquier ventaja futura necesitará su propia spec y el invariante de que su valor esperado por unidad apostada sea menor que el edge.
+  - El chat necesitará una base de datos, que se decidirá en un ADR aparte; nunca será autoridad sobre saldos, apuestas, experiencia ni nombres.
+  - Preguntas abiertas: cómo se pagan las comisiones de la sesión, los saldos en USDC, los valores por defecto de la sesión, la política de cambio de nombre y el cierre de cuentas.
