@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/* Dark, terminal-inspired palette. Text colors keep WCAG AA contrast on bg and surface. */
+@theme {
+  --color-bg: #0b0d10;
+  --color-surface: #12161b;
+  --color-surface-raised: #171c22;
+  --color-border: #232a33;
+  --color-fg: #d7dde4;
+  --color-muted: #8a96a3;
+  --color-accent: #4ade80;
+  --color-danger: #f87171;
+  --color-warn: #fbbf24;
+}
+
+@theme inline {
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-bg font-mono text-fg;
+}
+
+/* Keep the wallet adapter modal inside the terminal visual language. */
+.wallet-adapter-modal-wrapper,
+.wallet-adapter-button {
+  font-family: var(--font-mono);
+}

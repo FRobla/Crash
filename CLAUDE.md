@@ -4,9 +4,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # [TEST] — Guía del proyecto
 
-## Estado del repositorio
+## Stack y comandos
 
-El repositorio todavía no contiene código: solo esta guía y `changelog.md`. No hay stack, gestor de paquetes, comandos de build/lint/test ni estructura de módulos elegidos. Cuando se introduzcan, documenta aquí los comandos habituales (incluido cómo ejecutar una sola prueba) y la estructura real, y elimina este aviso.
+- Next.js 16 (App Router, Turbopack), React 19, TypeScript `strict`, Tailwind CSS v4, ESLint 9 (`eslint-config-next`), Vitest + Testing Library (jsdom).
+- Next.js 16 tiene cambios incompatibles con versiones anteriores: antes de escribir código de Next, consulta la guía relevante en `node_modules/next/dist/docs/`.
+- Gestor de paquetes: **pnpm** (versión fijada en `packageManager`). No uses npm ni yarn ni generes otros lockfiles. `pnpm-workspace.yaml` (`allowBuilds`) controla qué dependencias pueden ejecutar scripts de instalación; revisa cada paquete antes de permitirlo.
+- Red objetivo: **Solana devnet**. El cluster es la constante `SOLANA_CLUSTER` en `src/chain-adapters/solana/config.ts`, no una variable de entorno; pasar a mainnet exige un cambio de código deliberado con revisión legal, de riesgo y de seguridad. La UI comprueba el genesis hash del RPC y marca `wrong network` si no es devnet.
+- Configuración pública: `.env.example` (copiar a `.env.local`). Las variables `NEXT_PUBLIC_*` se incrustan en el bundle del navegador: nunca pongas secretos en ellas.
+
+| Tarea | Comando |
+| --- | --- |
+| Servidor de desarrollo | `pnpm dev` |
+| Build de producción / servir | `pnpm build` / `pnpm start` |
+| Lint | `pnpm lint` |
+| Tipos (genera tipos de rutas y ejecuta `tsc`) | `pnpm typecheck` |
+| Pruebas (una pasada / modo watch) | `pnpm test` / `pnpm test:watch` |
+| Un archivo o una prueba concreta | `pnpm vitest run src/games/crash/ui/BetPanel.test.tsx -t "disables placing"` |
+| Auditoría de dependencias | `pnpm audit` |
+
+Las pruebas viven junto al código (`*.test.ts[x]` bajo `src/`). Vitest no soporta Server Components `async`; esos se cubrirán con pruebas E2E cuando existan.
+
+## Estructura actual
+
+```
+src/
+  app/                  # Rutas y composición únicamente (sin reglas de negocio)
+    (dashboard)/        # Shell del dashboard: crash, history, fairness, bank
+  platform/             # Capacidades compartidas entre juegos
+    shell/              # Chrome del dashboard (sidebar, top bar, barra de estado, paneles)
+    wallets/            # Puerto agnóstico de cadena: WalletSession
+    product.ts          # Nombre provisional del producto
+  games/crash/ui/       # Presentación de Crash (sin motor ni reglas todavía)
+  chain-adapters/solana/  # Config devnet, salud del RPC, wallet adapter, activos
+```
+
+Límites de dependencias:
+- `games/*` y `platform/*` no importan de `chain-adapters/*`. La composición ocurre en `src/app` (p. ej., `app/(dashboard)/layout.tsx` inyecta los componentes de Solana en los slots del shell).
+- `chain-adapters/*` puede depender de puertos y UI de `platform/*`, nunca al revés.
+- El dominio de Crash (motor, reglas, randomness, settlement) se añadirá en `src/games/crash/` y `src/platform/*` cuando exista su especificación; no crees carpetas vacías por adelantado.
 
 ## Producto
 
@@ -119,3 +154,13 @@ Realiza una comprobación de seguridad en cada cambio, aunque parezca pequeño. 
 ## Evolución prevista
 
 Prioriza el MVP: Solana, SOL/USDC, Crash, house bank, provably fair, cash-out manual y automático, y web app. Diseña los límites de módulos para permitir después más tokens, juegos, redes, un SDK/API para integraciones externas e infraestructura de house bank multi-game/multi-chain. No implementes esas fases anticipadamente salvo que exista una necesidad concreta del MVP.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
