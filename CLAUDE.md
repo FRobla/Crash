@@ -106,8 +106,8 @@ Realiza una comprobación de seguridad en cada cambio, aunque parezca pequeño. 
 
 ## Calidad y cambios
 
-- Escribe siempre el código fuente, nombres de variables, funciones, tipos, archivos y módulos, comentarios, docstrings y nombres de pruebas en inglés americano (`en-US`). Mantén la ortografía y terminología consistentes; el texto visible para usuarios debe seguir los requisitos de idioma y localización del producto.
 - Antes de editar, inspecciona las instrucciones del repositorio, el código y las pruebas cercanas. Sigue las convenciones existentes y mantén los cambios acotados.
+- Usa inglés americano (`en-US`) en el código, identificadores, comentarios, docstrings y nombres de pruebas. El texto visible de la interfaz debe seguir los requisitos de localización del producto.
 - No introduzcas arquitectura, dependencias o infraestructura que no ayuden a un requisito concreto. Si una decisión de producto o seguridad está sin definir, anota la pregunta y sus opciones en vez de inventar una política.
 - Para cambios de reglas económicas, randomness, settlement, balances o adaptadores, añade pruebas que cubran invariantes, límites, errores y casos concurrentes relevantes.
 - Usa aritmética entera o decimal de precisión fija para cantidades económicas, con unidades y reglas de redondeo explícitas.
