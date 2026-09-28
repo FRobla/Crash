@@ -34,14 +34,20 @@ src/
     shell/              # Chrome del dashboard (sidebar, top bar, barra de estado, paneles)
     wallets/            # Puerto agnóstico de cadena: WalletSession
     product.ts          # Nombre provisional del producto
-  games/crash/ui/       # Presentación de Crash (sin motor ni reglas todavía)
+  games/crash/domain/   # Motor puro de Crash: curva, crash point, límites, liquidación, ciclo de vida
+  games/crash/ui/       # Presentación de Crash (todavía sin conectar al motor)
   chain-adapters/solana/  # Config devnet, salud del RPC, wallet adapter, activos
+docs/
+  specs/                # Especificaciones (spec-first); crash-round-rules.md define el motor
+  adr/                  # Decisiones de arquitectura; estado propuesto/aceptado en cada una
 ```
+
+- `games/crash/domain/` es TypeScript puro: sin React, Next, Solana ni reloj/aleatoriedad. Importes en `bigint` (unidades base), multiplicadores en `bigint` de diezmilésimas. Cualquier cambio de reglas exige actualizar primero `docs/specs/crash-round-rules.md` y sus invariantes (pruebas de propiedades con `fast-check`).
 
 Límites de dependencias:
 - `games/*` y `platform/*` no importan de `chain-adapters/*`. La composición ocurre en `src/app` (p. ej., `app/(dashboard)/layout.tsx` inyecta los componentes de Solana en los slots del shell).
 - `chain-adapters/*` puede depender de puertos y UI de `platform/*`, nunca al revés.
-- El dominio de Crash (motor, reglas, randomness, settlement) se añadirá en `src/games/crash/` y `src/platform/*` cuando exista su especificación; no crees carpetas vacías por adelantado.
+- Las reglas de Crash ya viven en `src/games/crash/domain/`. Randomness, house bank y settlement on-chain se añadirán en `src/platform/*` y `src/chain-adapters/*` cuando se acepten los ADRs 0001/0002 y exista su especificación; no crees carpetas vacías por adelantado.
 
 ## Producto
 
@@ -148,7 +154,7 @@ Realiza una comprobación de seguridad en cada cambio, aunque parezca pequeño. 
 - Usa aritmética entera o decimal de precisión fija para cantidades económicas, con unidades y reglas de redondeo explícitas.
 - Valida los cambios con las pruebas o comprobaciones más específicas disponibles; informa de las comprobaciones que no se pudieron ejecutar.
 - Actualiza documentación y verificadores cuando cambie un contrato observable, una regla económica o el formato de los datos provably fair.
-- Actualiza el `changelog.md` de la raíz para cada cambio importante. Añade una entrada fechada, breve y orientada al impacto, que describa qué cambió y, cuando sea relevante, sus efectos en comportamiento, seguridad, economía o compatibilidad. No registres cada ajuste trivial ni reescribas entradas anteriores.
+- Actualiza el `changelog.md` de la raíz para cada cambio importante, en el mismo cambio y antes de darlo por terminado: un cambio importante sin su entrada en el changelog no está completo. Añade una entrada fechada, breve y orientada al impacto, que describa qué cambió y, cuando sea relevante, sus efectos en comportamiento, seguridad, economía o compatibilidad. No registres cada ajuste trivial ni reescribas entradas anteriores.
 - Considera importante cualquier cambio que afecte a comportamiento observable, arquitectura, contratos, persistencia, APIs, reglas económicas, seguridad, despliegue o experiencia de usuario significativa. Si el archivo todavía no existe, créalo al registrar el primer cambio importante.
 
 ## Evolución prevista
