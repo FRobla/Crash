@@ -1,0 +1,35 @@
+{
+ "closeBetting": {
+  "signature": "4VJVyp4F6YQWWsB1vkrkbHDyDGjKChxtm6gURJrEMbrbN87t5TGGzVpRP4aXwANYXpV4MYDt4h1wDEYwAvqRSgLU",
+  "accounts": [
+   "Sbko1ZRWWaWvWgedE7TVkKWWkKTTLWCtzQGHzRfEt9d",
+   "CTNq2KzQwAMaRiYQYfUSvTW2CiBjR22SMgUHHm4D7xwG",
+   "3gNTQo8XRg1HomKXtpkq6GWr5jHvcxkG4xV15bzMkjTR",
+   "46cA9XaCNcmrUyz5Eez7cN3KBPNVAkcDi6axGGJLH87E",
+   "EYiAmGSdsQTuCw413V5BzaruWuCCSDgTPtBGvLkXHbe7",
+   "Hdu1niJgqVGhesoxgy37p6WBunVDoBacZJZVK7VRRevg",
+   "SysvarS1otHashes111111111111111111111111111",
+   "Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2"
+  ]
+ },
+ "startRound": {
+  "signature": "4d1a9qe76KmaKcu1Ncwk9KB7HFs2QiupnZM3N2Tc27iDNc4LBdff65ZGSv7eaopht9F7Ua3fnktVUuJDyTr6mWtJ",
+  "accounts": [
+   "Sbko1ZRWWaWvWgedE7TVkKWWkKTTLWCtzQGHzRfEt9d",
+   "CTNq2KzQwAMaRiYQYfUSvTW2CiBjR22SMgUHHm4D7xwG",
+   "3R48JPhp8zkRokLdGJx8rFDT53CiKz92BYJErkipzpqV",
+   "3gNTQo8XRg1HomKXtpkq6GWr5jHvcxkG4xV15bzMkjTR",
+   "46cA9XaCNcmrUyz5Eez7cN3KBPNVAkcDi6axGGJLH87E",
+   "Hdu1niJgqVGhesoxgy37p6WBunVDoBacZJZVK7VRRevg",
+   "EYiAmGSdsQTuCw413V5BzaruWuCCSDgTPtBGvLkXHbe7",
+   "3x3kPB13ZfLgAAMtFy8zHegL1Kv7HTcLSdt2vtAxXqVw",
+   "4H3UkNVbEAMGVYH2LtW9tEx5GkrrZ1GsZKTtezaDzEiq",
+   "4UFmCebEmzESoDTtHrmaftXj7YAsAH4HMios3yMWyVUT",
+   "SysvarS1otHashes111111111111111111111111111",
+   "11111111111111111111111111111111",
+   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+   "So11111111111111111111111111111111111111112",
+   "Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2"
+  ]
+ }
+}

@@ -19,3 +19,10 @@ export const CRASH_RULES_V1: CrashRules = Object.freeze({
   growthPpm: 24_000n,
   maxMultiplier: 1_000_000n,
 });
+
+const RULES_BY_VERSION: ReadonlyMap<number, CrashRules> = new Map([[CRASH_RULES_V1.version, CRASH_RULES_V1]]);
+
+/** Published rule set for a round's `rulesVersion`; `null` if this build does not know it. */
+export function rulesForVersion(version: number): CrashRules | null {
+  return RULES_BY_VERSION.get(version) ?? null;
+}

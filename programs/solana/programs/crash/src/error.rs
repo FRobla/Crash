@@ -38,8 +38,12 @@ pub enum CrashError {
     InsufficientBank,
     #[msg("Withdrawal would leave reserved exposure uncovered")]
     WithdrawalExceedsAvailable,
-    #[msg("The bet has already been settled")]
-    BetAlreadySettled,
+    #[msg("The player has no bet in play")]
+    NoActiveBet,
+    #[msg("The player already has a bet in play; settle it first")]
+    ActiveBetPending,
+    #[msg("The bet in play belongs to another round")]
+    BetRoundMismatch,
     #[msg("The bet already has a cash-out")]
     AlreadyCashedOut,
     #[msg("Cash-out is below 1.01x")]
@@ -64,6 +68,26 @@ pub enum CrashError {
     StaleRandomness,
     #[msg("The entropy deadline has passed; only void applies")]
     EntropyDeadlinePassed,
+    #[msg("Usernames must be 3-16 characters in [a-z0-9_]")]
+    InvalidUsername,
+    #[msg("The username was changed too recently")]
+    UsernameCooldown,
+    #[msg("The username record does not match the player's current name")]
+    UsernameRecordMismatch,
+    #[msg("The signer is neither the player nor a session allowed to do this")]
+    Unauthorized,
+    #[msg("The session has expired")]
+    SessionExpired,
+    #[msg("The session spend cap would be exceeded")]
+    SessionSpendCapExceeded,
+    #[msg("Invalid session key, expiry or spend cap")]
+    InvalidSession,
+    #[msg("The player has no session")]
+    NoSession,
+    #[msg("The player balance is insufficient")]
+    InsufficientBalance,
+    #[msg("The player still has a balance or a bet in play")]
+    PlayerNotEmpty,
     #[msg("Arithmetic overflow")]
     ArithmeticOverflow,
     #[msg("Rules error")]

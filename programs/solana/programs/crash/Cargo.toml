@@ -1,7 +1,7 @@
 [package]
 name = "crash"
 version = "0.1.0"
-description = "Crash settlement authority (docs/specs/crash-program.md)"
+description = "Crash settlement authority (docs/specs/crash-program-v2.md)"
 edition.workspace = true
 rust-version.workspace = true
 publish = false

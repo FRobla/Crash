@@ -20,6 +20,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Tipos (genera tipos de rutas y ejecuta `tsc`) | `pnpm typecheck` |
 | Pruebas (una pasada / modo watch) | `pnpm test` / `pnpm test:watch` |
 | Un archivo o una prueba concreta | `pnpm vitest run src/games/crash/ui/BetPanel.test.tsx -t "disables placing"` |
+| Crank del operador (compila y ejecuta; lee `.env.operator`, plantilla en `services/operator/operator.env.example`) | `pnpm operator` |
+| Jugador end-to-end en devnet contra el crank en marcha (fondea desde el keypair del operador y lo devuelve) | `pnpm operator:e2e` |
 | Auditoría de dependencias | `pnpm audit` |
 | Regenerar vectores de referencia tras un cambio **deliberado** de reglas | `pnpm vitest run reference-vectors -u` |
 
@@ -35,9 +37,10 @@ Anchor no soporta Windows de forma nativa. El toolchain vive en **WSL `Ubuntu-24
 
 - `solana config get` debe apuntar a `https://api.devnet.solana.com`. El keypair de WSL (`~/.config/solana/id.json`) es **solo de desarrollo**: vive fuera del repo, nunca se commitea ni se usa con fondos reales.
 - El repo está en `/mnt/c/...`. Compilar Rust sobre el sistema de archivos de Windows es lento; si molesta, clona el repo dentro de WSL.
-- Workspace Anchor en `programs/solana/` (spec: `docs/specs/crash-program.md`). `rust-toolchain.toml` fija rustc **1.98.1** para pruebas e IDL (LiteSVM 0.17/Agave 4.3 exige ≥ 1.97.1); el `.so` lo compila platform-tools (SBPF v3). LiteSVM 0.10 —el que trae la plantilla de Anchor 1.2— no carga SBPF v3: usa 0.17.
-- **Desplegado en devnet** (2026-09-28): programa `384CfvvBXN52P4vga71WS7VUT9wv1HtB7YTR3UYLtZK4`. La autoridad de upgrade, admin y operador es el keypair de la CLI de WSL (`3R48JPhp8zkRokLdGJx8rFDT53CiKz92BYJErkipzpqV`, solo devnet). La cuenta de randomness de Switchboard de la casa es `EfdNfj2bMPdgt75k1cBYrzxCczp3ixd43ywuWuF8zRbL` (authority: PDA `kCywknKJWMH4H7jnNUPodPsM4KRQLkA2tqhE8QDZNRg`). Para actualizar: `anchor build` y `solana program deploy "$CARGO_TARGET_DIR/deploy/crash.so" --program-id "$CARGO_TARGET_DIR/deploy/crash-keypair.json"`. Cambiar el layout de `HouseConfig`, `Round` o `Bet` rompe las cuentas ya creadas: exige migración o casa nueva.
-- Usa `CARGO_TARGET_DIR="$HOME/.cache/crashit/target"` (fuera de `/mnt/c`, mucho más rápido). El keypair del programa queda en `$CARGO_TARGET_DIR/deploy/crash-keypair.json`, nunca en el repo; en otra máquina, `anchor keys sync` genera uno nuevo y actualiza `declare_id!`/`Anchor.toml`.
+- Workspace Anchor en `programs/solana/` (spec vigente: `docs/specs/crash-program-v2.md`, que solo describe los cambios sobre `crash-program.md` v1.1). `rust-toolchain.toml` fija rustc **1.98.1** para pruebas e IDL (LiteSVM 0.17/Agave 4.3 exige ≥ 1.97.1); el `.so` lo compila platform-tools (SBPF v3). LiteSVM 0.10 —el que trae la plantilla de Anchor 1.2— no carga SBPF v3: usa 0.17.
+- **Desplegado en devnet (v2, 2026-09-29):** programa `DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM`; casa `Sbko1ZRWWaWvWgedE7TVkKWWkKTTLWCtzQGHzRfEt9d`; cuenta de randomness `3gNTQo8XRg1HomKXtpkq6GWr5jHvcxkG4xV15bzMkjTR` (authority: PDA `46cA9XaCNcmrUyz5Eez7cN3KBPNVAkcDi6axGGJLH87E`).
+- **v1.1 retirada** (2026-09-29): el programa `384CfvvBXN52P4vga71WS7VUT9wv1HtB7YTR3UYLtZK4` sigue desplegado solo para consultar sus rondas; su bank se retiró. El código actual **no debe desplegarse sobre ese id**. En ambos, la autoridad de upgrade, admin y operador es el keypair de la CLI de WSL (`3R48JPhp8zkRokLdGJx8rFDT53CiKz92BYJErkipzpqV`, solo devnet). Para actualizar: `anchor build` y `solana program deploy "$CARGO_TARGET_DIR/deploy/crash.so" --program-id "$CARGO_TARGET_DIR/deploy/crash-keypair.json" --with-compute-unit-price 1000` (sin `--use-rpc`: con la RPC pública la escritura del buffer falla por HTTP 429; si falla, `solana program close <buffer>` recupera los SOL). Cambiar el layout de `HouseConfig`, `Round`, `Player` o `UsernameRecord` rompe las cuentas ya creadas: exige migración o casa nueva.
+- Usa `CARGO_TARGET_DIR="$HOME/.cache/crashit/target"` (fuera de `/mnt/c`, mucho más rápido). El keypair del programa queda en `$CARGO_TARGET_DIR/deploy/crash-keypair.json` (el de v1.1, en `crash-v1-keypair.json`), nunca en el repo; en otra máquina, `anchor keys sync` genera uno nuevo y actualiza `declare_id!`/`Anchor.toml`.
 
 | Tarea (dentro de WSL, en `programs/solana/`) | Comando |
 | --- | --- |
@@ -46,7 +49,7 @@ Anchor no soporta Windows de forma nativa. El toolchain vive en **WSL `Ubuntu-24
 | Todas las pruebas Rust (reglas puras + adaptador de Switchboard + LiteSVM; requieren los dos `.so` anteriores) | `cargo test` |
 | Solo la lógica pura contra los vectores | `cargo test -p crash-rules` |
 
-Las pruebas viven junto al código (`*.test.ts[x]` bajo `src/`). Vitest no soporta Server Components `async`; esos se cubrirán con pruebas E2E cuando existan.
+Las pruebas viven junto al código (`*.test.ts[x]` bajo `src/` y `services/`). Las que derivan PDAs o claves con web3.js declaran `// @vitest-environment node`: en jsdom falla `findProgramAddressSync`. Vitest no soporta Server Components `async`; esos se cubrirán con pruebas E2E cuando existan.
 
 ## Estructura actual
 
@@ -57,13 +60,19 @@ src/
   platform/             # Capacidades compartidas entre juegos
     shell/              # Chrome del dashboard (sidebar, top bar, barra de estado, paneles)
     wallets/            # Puerto agnóstico de cadena: WalletSession
+    player-accounts/    # Puerto de cuenta de jugador (saldo en monedas, sesión, alta, salida) y su panel
+    transactions/       # Estado de una acción (firmando/confirmando/confirmada/rechazada)
     product.ts          # Nombre provisional del producto
   games/crash/domain/   # Motor puro de Crash: curva, crash point, límites, liquidación, ciclo de vida
-  games/crash/ui/       # Presentación de Crash (todavía sin conectar al motor)
-  chain-adapters/solana/  # Config devnet, salud del RPC, wallet adapter, activos
+  games/crash/fairness/ # Verificador del esquema C (commit, entropía, crash point) sobre bytes
+  games/crash/ui/       # Puerto de la partida en vivo (crash-game.ts), vistas y lógica de presentación pura
+  chain-adapters/solana/  # Config devnet, salud del RPC, wallet adapter
+    crash-program/      # Codec desde el IDL versionado, PDAs, eventos, errores y hooks que implementan los puertos
+    switchboard/        # Switchboard off-chain sin SDK: cola, oráculos, gateway del reveal
+services/operator/      # Crank del operador (Node, fuera del bundle web) y jugador E2E de devnet
 programs/solana/        # Workspace Anchor (Rust); fuera de src/ y del toolchain JS
   crates/crash-rules/   # Reglas puras en Rust (no_std, sin Anchor); reproducen los vectores de TS exactamente
-  programs/crash/       # Programa on-chain: autoridad de apuestas, cash-outs y liquidación (tests LiteSVM)
+  programs/crash/       # Programa on-chain: cuentas de jugador (saldo, sesiones, nombre, experiencia), apuestas, cash-outs y liquidación (tests LiteSVM)
                         #   src/switchboard.rs: adaptador mínimo de Switchboard On-Demand (sin su crate)
   test-programs/switchboard-mock/  # SOLO PRUEBAS: stand-in de Switchboard en LiteSVM; nunca se despliega
 docs/
@@ -77,9 +86,10 @@ docs/
 - Las reglas se versionan (`CRASH_RULES_V1` en `domain/rules.ts`): una versión publicada es inmutable. Cambiar algoritmo o parámetros exige una versión nueva con su propio `docs/specs/vectors/crash-rules-v<N>.json`; la prueba `reference-vectors.test.ts` falla si el JSON no coincide con el motor.
 
 Límites de dependencias:
-- `games/*` y `platform/*` no importan de `chain-adapters/*`. La composición ocurre en `src/app` (p. ej., `app/(dashboard)/layout.tsx` inyecta los componentes de Solana en los slots del shell).
+- `games/*` y `platform/*` no importan de `chain-adapters/*`. La composición ocurre en `src/app` (p. ej., `app/(dashboard)/layout.tsx` inyecta los componentes de Solana en los slots del shell, y `crash-runtime.tsx` conecta el adaptador Solana a los puertos `CrashGamePort` y `PlayerAccountPort`).
+- `chain-adapters/*` tampoco importa de `games/*`: devuelve vistas estructuralmente compatibles con los puertos y `src/app` las tipa contra ellos. `services/operator/` sí usa `games/crash/domain` y `fairness` (reglas y verificación compartidas) y nunca se importa desde `src/`.
 - `chain-adapters/*` puede depender de puertos y UI de `platform/*`, nunca al revés.
-- Las reglas de Crash ya viven en `src/games/crash/domain/`. La autoridad de settlement es un programa Anchor (ADR 0001, aceptado) especificado en `docs/specs/crash-program.md` (aprobada v1.1); randomness usa el esquema C de ADR 0002 (aceptado) con Switchboard On-Demand y una PDA del programa como authority. El program id de Switchboard está fijado al de devnet en `switchboard.rs`. ADR 0003 (propuesto) define saldo de jugador on-chain en una PDA `Player`, monedas (1 moneda = 10⁶ lamports), claves de sesión, nombre de usuario y experiencia on-chain; hasta que se acepte y exista la spec v2 del programa, el código sigue el modelo actual de una cuenta `Bet` por apuesta. No crees carpetas vacías por adelantado.
+- Las reglas de Crash ya viven en `src/games/crash/domain/`. La autoridad de settlement es un programa Anchor (ADR 0001, aceptado) especificado en `docs/specs/crash-program-v2.md` sobre `crash-program.md` v1.1; el cliente web y el crank, en `docs/specs/crash-client-v1.md` (IDL versionado en `chain-adapters/solana/crash-program/idl/crash.json`: regenerarlo solo si cambia el programa); randomness usa el esquema C de ADR 0002 (aceptado) con Switchboard On-Demand y una PDA del programa como authority. El program id de Switchboard está fijado al de devnet en `switchboard.rs`. ADR 0003 (aceptado) define saldo de jugador on-chain en una PDA `Player`, monedas (1 moneda = 10⁶ lamports), claves de sesión, nombre de usuario y experiencia on-chain; su diseño está en `docs/specs/crash-program-v2.md` (aprobada, implementada y desplegada en devnet). La moneda es solo presentación: el programa y el motor trabajan en lamports. No crees carpetas vacías por adelantado.
 
 ## Producto
 

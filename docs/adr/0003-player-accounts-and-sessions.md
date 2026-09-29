@@ -1,6 +1,6 @@
 # ADR 0003 — Cuentas de jugador, monedas y sesiones
 
-- Estado: **propuesto** (2026-09-28). Incorpora las decisiones del usuario del 2026-09-28: opción A, nombre de usuario on-chain, el nivel dará ventajas en el futuro, sin comisión de compra/venta y chat con base de datos. Quedan por confirmar los puntos de [Preguntas abiertas](#preguntas-abiertas).
+- Estado: **aceptado** el 2026-09-29. Incluye las decisiones del usuario del 2026-09-28 (opción A, nombre de usuario on-chain, el nivel dará ventajas en el futuro, sin comisión de compra/venta y chat con base de datos) y todas las propuestas de [Preguntas abiertas](#preguntas-abiertas), aceptadas el 2026-09-29. El diseño detallado está en la [spec del programa v2](../specs/crash-program-v2.md); allí la cuenta `Username` se llama `UsernameRecord`.
 - Fecha: 2026-09-28
 - Relacionado: [ADR 0001](0001-settlement-authority.md) (se mantiene), [ADR 0002](0002-randomness-source.md) (sin cambios), [spec del programa](../specs/crash-program.md) (exigirá una v2), [spec de reglas](../specs/crash-round-rules.md) (sin cambios)
 
@@ -122,7 +122,7 @@ El chat necesita un backend con base de datos, que hoy no existe. Su elección (
 2. **Solvencia de la casa**, sin cambios: `vault.lamports − rent_min ≥ reserved_exposure`.
 3. **Conservación:** el total de lamports de `Player`s y vault solo cambia con `buy_coins`, `sell_coins`, `deposit_bank`, `withdraw_bank` y rent. Una apuesta y su liquidación solo mueven lamports entre `Player` y vault.
 4. **Destino único:** los lamports de `Player` solo salen hacia el vault (`place_bet`) o hacia `owner` (`sell_coins` y `close_player`).
-5. **Sesión acotada:** una sesión nunca aparece como firmante válido fuera de `place_bet`, `cash_out` y `revoke_session`, ni pasado `expires_slot`, ni superado `spend_cap`.
+5. **Sesión acotada:** una sesión nunca aparece como firmante válido fuera de `place_bet`, `cash_out` y `revoke_session`. En `place_bet` exige además no haber pasado `expires_slot` ni superar `spend_cap`. `cash_out` y `revoke_session` se permiten con la sesión caducada, porque no comprometen fondos (spec v2 §4).
 6. **Salida siempre disponible:** la pausa nunca bloquea `sell_coins`, `revoke_session`, `cash_out`, `settle_bet` ni `close_player`.
 7. **Experiencia:** `total_wagered` solo crece en `settle_bet` de rondas `Crashed` y nunca se cuenta dos veces.
 8. **Unicidad:** un nombre normalizado pertenece como mucho a un `Player`.
@@ -154,6 +154,8 @@ El chat necesita un backend con base de datos, que hoy no existe. Su elección (
 - **Regulación:** que el saldo sea on-chain y lo pueda retirar su dueño en cualquier momento reduce la custodia, pero no cambia la naturaleza de juego con valor real. Sigue haciendo falta revisión legal antes de mainnet.
 
 ## Preguntas abiertas
+
+Resueltas el 2026-09-29: el usuario acepta todas las propuestas. Los valores concretos de 3 y 4 están en la spec v2, §6: sesión de 24 h por defecto y 7 días como máximo, tope de gasto igual al saldo, 0.01 SOL de presupuesto de comisiones y 7 días entre cambios de nombre. La 5 se resuelve permitiendo `close_player` con un aviso claro en la UI.
 
 1. **Comisiones de la sesión:** propuesta, la wallet transfiere `fee_budget` a la clave de sesión al crearla. No hace falta backend, y lo que quede se recupera al revocar si la clave sigue disponible. Alternativa: un relayer del operador paga las comisiones, lo que exige un servicio y pasa a ser un punto de liveness.
 2. **USDC:** propuesta, saldos separados por activo (`Player` por activo o por mint), sin mezclar SOL y USDC en una misma moneda, para no crear riesgo cambiario para la casa.

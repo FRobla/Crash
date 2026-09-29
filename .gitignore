@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# operator crank bundle (built by `pnpm operator:build`)
+/services/operator/dist/

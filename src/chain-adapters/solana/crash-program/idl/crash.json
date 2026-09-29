@@ -1,0 +1,3452 @@
+{
+  "address": "DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM",
+  "metadata": {
+    "name": "crash",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Crash settlement authority (docs/specs/crash-program-v2.md)"
+  },
+  "instructions": [
+    {
+      "name": "buy_coins",
+      "discriminator": [
+        210,
+        116,
+        3,
+        207,
+        17,
+        87,
+        42,
+        11
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "player"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "cash_out",
+      "discriminator": [
+        1,
+        110,
+        57,
+        58,
+        159,
+        157,
+        243,
+        192
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "docs": [
+            "The player's wallet or its session key, even if expired (spec v2 §4)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "round",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round.round_id",
+                "account": "Round"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player.owner",
+                "account": "Player"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "change_username",
+      "discriminator": [
+        122,
+        228,
+        203,
+        143,
+        188,
+        195,
+        189,
+        130
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "player"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  110,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "username"
+              }
+            ]
+          }
+        },
+        {
+          "name": "old_record",
+          "docs": [
+            "Record of the current name; required iff the player has one. Its rent goes back to the owner."
+          ],
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  110,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player.username",
+                "account": "Player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "username",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "close_betting",
+      "discriminator": [
+        183,
+        243,
+        76,
+        1,
+        242,
+        130,
+        138,
+        58
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round.round_id",
+                "account": "Round"
+              }
+            ]
+          }
+        },
+        {
+          "name": "randomness",
+          "writable": true
+        },
+        {
+          "name": "randomness_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  110,
+                  100,
+                  111,
+                  109,
+                  110,
+                  101,
+                  115,
+                  115,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "queue"
+        },
+        {
+          "name": "oracle",
+          "writable": true
+        },
+        {
+          "name": "recent_slothashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
+        },
+        {
+          "name": "switchboard_program",
+          "address": "Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_player",
+      "discriminator": [
+        225,
+        227,
+        204,
+        63,
+        32,
+        122,
+        58,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "player"
+          ]
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "username_record",
+          "docs": [
+            "Record of the current name; required iff the player has one."
+          ],
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  110,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player.username",
+                "account": "Player"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_randomness_account",
+      "discriminator": [
+        114,
+        186,
+        225,
+        142,
+        213,
+        242,
+        171,
+        170
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "randomness",
+          "docs": [
+            "Fresh keypair; Switchboard creates the account at this address."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "randomness_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  110,
+                  100,
+                  111,
+                  109,
+                  110,
+                  101,
+                  115,
+                  115,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reward_escrow",
+          "writable": true
+        },
+        {
+          "name": "queue",
+          "writable": true
+        },
+        {
+          "name": "program_state"
+        },
+        {
+          "name": "lut_signer"
+        },
+        {
+          "name": "lut",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "wrapped_sol_mint",
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "address_lookup_table_program",
+          "address": "AddressLookupTab1e1111111111111111111111111"
+        },
+        {
+          "name": "switchboard_program",
+          "address": "Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2"
+        }
+      ],
+      "args": [
+        {
+          "name": "recent_slot",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "create_session",
+      "discriminator": [
+        242,
+        193,
+        143,
+        179,
+        150,
+        25,
+        122,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "player"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session_key",
+          "docs": [
+            "Browser key; it receives `fee_budget` to pay its own transaction fees."
+          ],
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "expires_slot",
+          "type": "u64"
+        },
+        {
+          "name": "spend_cap",
+          "type": "u64"
+        },
+        {
+          "name": "fee_budget",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "deposit_bank",
+      "discriminator": [
+        67,
+        111,
+        232,
+        241,
+        243,
+        77,
+        157,
+        131
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "forfeit_round",
+      "discriminator": [
+        240,
+        66,
+        88,
+        50,
+        231,
+        180,
+        82,
+        5
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round.round_id",
+                "account": "Round"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_house",
+      "discriminator": [
+        180,
+        46,
+        86,
+        125,
+        135,
+        107,
+        214,
+        28
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "program",
+          "docs": [
+            "Only the program's upgrade authority may initialize, so nobody can front-run the admin role."
+          ],
+          "address": "DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "operator",
+          "type": "pubkey"
+        },
+        {
+          "name": "limits",
+          "type": {
+            "defined": {
+              "name": "Limits"
+            }
+          }
+        },
+        {
+          "name": "timeouts",
+          "type": {
+            "defined": {
+              "name": "Timeouts"
+            }
+          }
+        },
+        {
+          "name": "max_bets_per_round",
+          "type": "u32"
+        },
+        {
+          "name": "player_policy",
+          "type": {
+            "defined": {
+              "name": "PlayerPolicy"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "open_round",
+      "discriminator": [
+        66,
+        235,
+        123,
+        240,
+        8,
+        35,
+        185,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "operator",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config.next_round_id",
+                "account": "HouseConfig"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "commit",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "place_bet",
+      "discriminator": [
+        222,
+        62,
+        67,
+        220,
+        63,
+        166,
+        126,
+        33
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "docs": [
+            "The player's wallet or its session key (spec v2 §4)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "round_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player.owner",
+                "account": "Player"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "round_id",
+          "type": "u64"
+        },
+        {
+          "name": "stake",
+          "type": "u64"
+        },
+        {
+          "name": "auto_cash_out",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "register_player",
+      "discriminator": [
+        242,
+        146,
+        194,
+        234,
+        234,
+        145,
+        228,
+        42
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "username_record",
+          "docs": [
+            "`init` makes a taken name fail."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  110,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "username"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "username",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "reset_username",
+      "discriminator": [
+        145,
+        202,
+        224,
+        182,
+        249,
+        177,
+        64,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player.owner",
+                "account": "Player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "username_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  110,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player.username",
+                "account": "Player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "docs": [
+            "Receives the record's rent."
+          ],
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "reveal",
+      "discriminator": [
+        9,
+        35,
+        59,
+        190,
+        167,
+        249,
+        76,
+        115
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round.round_id",
+                "account": "Round"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "seed",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "revoke_session",
+      "discriminator": [
+        86,
+        92,
+        198,
+        120,
+        144,
+        2,
+        7,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "docs": [
+            "The owner or the session key itself, even if expired."
+          ],
+          "signer": true
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player.owner",
+                "account": "Player"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "sell_coins",
+      "discriminator": [
+        11,
+        84,
+        51,
+        144,
+        69,
+        55,
+        136,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "docs": [
+            "The only possible destination of the lamports."
+          ],
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "player"
+          ]
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "settle_bet",
+      "discriminator": [
+        115,
+        55,
+        234,
+        177,
+        227,
+        4,
+        10,
+        67
+      ],
+      "accounts": [
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round.round_id",
+                "account": "Round"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "docs": [
+            "Payouts can only go to the `Player` account that owns the bet."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player.owner",
+                "account": "Player"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "start_round",
+      "discriminator": [
+        144,
+        144,
+        43,
+        7,
+        193,
+        42,
+        217,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round.round_id",
+                "account": "Round"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "docs": [
+            "Anyone may start the round; they pay as the reveal's `payer`."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "randomness",
+          "writable": true
+        },
+        {
+          "name": "randomness_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  110,
+                  100,
+                  111,
+                  109,
+                  110,
+                  101,
+                  115,
+                  115,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "oracle"
+        },
+        {
+          "name": "queue"
+        },
+        {
+          "name": "stats",
+          "writable": true
+        },
+        {
+          "name": "reward_escrow",
+          "writable": true
+        },
+        {
+          "name": "program_state"
+        },
+        {
+          "name": "recent_slothashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "wrapped_sol_mint",
+          "address": "So11111111111111111111111111111111111111112"
+        },
+        {
+          "name": "switchboard_program",
+          "address": "Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2"
+        }
+      ],
+      "args": [
+        {
+          "name": "signature",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "recovery_id",
+          "type": "u8"
+        },
+        {
+          "name": "value",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_config",
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "operator",
+          "type": "pubkey"
+        },
+        {
+          "name": "limits",
+          "type": {
+            "defined": {
+              "name": "Limits"
+            }
+          }
+        },
+        {
+          "name": "timeouts",
+          "type": {
+            "defined": {
+              "name": "Timeouts"
+            }
+          }
+        },
+        {
+          "name": "max_bets_per_round",
+          "type": "u32"
+        },
+        {
+          "name": "paused",
+          "type": "bool"
+        },
+        {
+          "name": "player_policy",
+          "type": {
+            "defined": {
+              "name": "PlayerPolicy"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "void_round",
+      "discriminator": [
+        102,
+        72,
+        126,
+        187,
+        12,
+        18,
+        16,
+        96
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "round",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  111,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "round.round_id",
+                "account": "Round"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_bank",
+      "discriminator": [
+        145,
+        185,
+        146,
+        251,
+        166,
+        170,
+        41,
+        3
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  115,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "HouseConfig",
+      "discriminator": [
+        194,
+        237,
+        216,
+        79,
+        135,
+        254,
+        7,
+        212
+      ]
+    },
+    {
+      "name": "HouseVault",
+      "discriminator": [
+        125,
+        17,
+        104,
+        101,
+        16,
+        34,
+        39,
+        135
+      ]
+    },
+    {
+      "name": "Player",
+      "discriminator": [
+        205,
+        222,
+        112,
+        7,
+        165,
+        155,
+        206,
+        218
+      ]
+    },
+    {
+      "name": "Round",
+      "discriminator": [
+        87,
+        127,
+        165,
+        51,
+        73,
+        78,
+        116,
+        174
+      ]
+    },
+    {
+      "name": "UsernameRecord",
+      "discriminator": [
+        42,
+        172,
+        136,
+        41,
+        240,
+        123,
+        100,
+        204
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BankDeposited",
+      "discriminator": [
+        240,
+        174,
+        97,
+        155,
+        225,
+        225,
+        141,
+        83
+      ]
+    },
+    {
+      "name": "BankWithdrawn",
+      "discriminator": [
+        167,
+        112,
+        121,
+        102,
+        28,
+        114,
+        207,
+        144
+      ]
+    },
+    {
+      "name": "BetPlaced",
+      "discriminator": [
+        88,
+        88,
+        145,
+        226,
+        126,
+        206,
+        32,
+        0
+      ]
+    },
+    {
+      "name": "BetSettled",
+      "discriminator": [
+        57,
+        145,
+        224,
+        160,
+        62,
+        119,
+        227,
+        206
+      ]
+    },
+    {
+      "name": "BettingClosed",
+      "discriminator": [
+        23,
+        184,
+        157,
+        244,
+        65,
+        44,
+        152,
+        70
+      ]
+    },
+    {
+      "name": "CashOutRecorded",
+      "discriminator": [
+        203,
+        217,
+        114,
+        173,
+        10,
+        53,
+        228,
+        240
+      ]
+    },
+    {
+      "name": "CoinsBought",
+      "discriminator": [
+        168,
+        115,
+        40,
+        33,
+        47,
+        233,
+        232,
+        240
+      ]
+    },
+    {
+      "name": "CoinsSold",
+      "discriminator": [
+        234,
+        16,
+        142,
+        83,
+        156,
+        178,
+        190,
+        101
+      ]
+    },
+    {
+      "name": "PlayerClosed",
+      "discriminator": [
+        21,
+        199,
+        169,
+        47,
+        52,
+        171,
+        62,
+        72
+      ]
+    },
+    {
+      "name": "PlayerRegistered",
+      "discriminator": [
+        175,
+        78,
+        252,
+        170,
+        75,
+        230,
+        36,
+        251
+      ]
+    },
+    {
+      "name": "RandomnessAccountSet",
+      "discriminator": [
+        114,
+        21,
+        122,
+        84,
+        162,
+        238,
+        214,
+        48
+      ]
+    },
+    {
+      "name": "RoundForfeited",
+      "discriminator": [
+        7,
+        205,
+        68,
+        7,
+        25,
+        16,
+        11,
+        186
+      ]
+    },
+    {
+      "name": "RoundOpened",
+      "discriminator": [
+        99,
+        173,
+        228,
+        72,
+        142,
+        57,
+        109,
+        178
+      ]
+    },
+    {
+      "name": "RoundRevealed",
+      "discriminator": [
+        99,
+        213,
+        118,
+        5,
+        55,
+        211,
+        57,
+        71
+      ]
+    },
+    {
+      "name": "RoundStarted",
+      "discriminator": [
+        180,
+        209,
+        2,
+        244,
+        238,
+        48,
+        170,
+        120
+      ]
+    },
+    {
+      "name": "RoundVoided",
+      "discriminator": [
+        236,
+        16,
+        226,
+        252,
+        168,
+        201,
+        103,
+        69
+      ]
+    },
+    {
+      "name": "SessionCreated",
+      "discriminator": [
+        107,
+        111,
+        254,
+        25,
+        21,
+        122,
+        220,
+        225
+      ]
+    },
+    {
+      "name": "SessionRevoked",
+      "discriminator": [
+        90,
+        48,
+        35,
+        234,
+        203,
+        192,
+        126,
+        211
+      ]
+    },
+    {
+      "name": "UsernameChanged",
+      "discriminator": [
+        136,
+        205,
+        36,
+        212,
+        96,
+        88,
+        142,
+        161
+      ]
+    },
+    {
+      "name": "UsernameReset",
+      "discriminator": [
+        88,
+        175,
+        130,
+        19,
+        78,
+        252,
+        99,
+        168
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidConfig",
+      "msg": "Invalid house configuration"
+    },
+    {
+      "code": 6001,
+      "name": "ZeroAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6002,
+      "name": "Paused",
+      "msg": "The house is paused"
+    },
+    {
+      "code": 6003,
+      "name": "RoundStillActive",
+      "msg": "Another round is still active"
+    },
+    {
+      "code": 6004,
+      "name": "EmptyCommitment",
+      "msg": "The commitment must not be empty"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidPhase",
+      "msg": "The round is not in the required phase"
+    },
+    {
+      "code": 6006,
+      "name": "BettingClosed",
+      "msg": "The betting window has closed"
+    },
+    {
+      "code": 6007,
+      "name": "BettingStillOpen",
+      "msg": "The betting window is still open"
+    },
+    {
+      "code": 6008,
+      "name": "StakeBelowMinimum",
+      "msg": "Stake is below the minimum"
+    },
+    {
+      "code": 6009,
+      "name": "StakeAboveMaximum",
+      "msg": "Stake is above the maximum"
+    },
+    {
+      "code": 6010,
+      "name": "AutoCashOutNotCentiPrecise",
+      "msg": "Auto cash-out must be a multiple of 0.01x"
+    },
+    {
+      "code": 6011,
+      "name": "AutoCashOutBelowMinimum",
+      "msg": "Auto cash-out is below 1.01x"
+    },
+    {
+      "code": 6012,
+      "name": "AutoCashOutAboveMaximum",
+      "msg": "Auto cash-out is above the maximum multiplier"
+    },
+    {
+      "code": 6013,
+      "name": "PayoutAboveMaximum",
+      "msg": "Potential payout is above the maximum"
+    },
+    {
+      "code": 6014,
+      "name": "RoundExposureExceeded",
+      "msg": "The round exposure limit would be exceeded"
+    },
+    {
+      "code": 6015,
+      "name": "TooManyBets",
+      "msg": "The round has reached its maximum number of bets"
+    },
+    {
+      "code": 6016,
+      "name": "InsufficientBank",
+      "msg": "The house bank cannot cover this bet"
+    },
+    {
+      "code": 6017,
+      "name": "WithdrawalExceedsAvailable",
+      "msg": "Withdrawal would leave reserved exposure uncovered"
+    },
+    {
+      "code": 6018,
+      "name": "NoActiveBet",
+      "msg": "The player has no bet in play"
+    },
+    {
+      "code": 6019,
+      "name": "ActiveBetPending",
+      "msg": "The player already has a bet in play; settle it first"
+    },
+    {
+      "code": 6020,
+      "name": "BetRoundMismatch",
+      "msg": "The bet in play belongs to another round"
+    },
+    {
+      "code": 6021,
+      "name": "AlreadyCashedOut",
+      "msg": "The bet already has a cash-out"
+    },
+    {
+      "code": 6022,
+      "name": "CashOutTooEarly",
+      "msg": "Cash-out is below 1.01x"
+    },
+    {
+      "code": 6023,
+      "name": "RoundHorizonExceeded",
+      "msg": "The round horizon has been exceeded"
+    },
+    {
+      "code": 6024,
+      "name": "CommitmentMismatch",
+      "msg": "The revealed seed does not match the commitment"
+    },
+    {
+      "code": 6025,
+      "name": "RevealTooEarly",
+      "msg": "The curve has not reached the crash point yet"
+    },
+    {
+      "code": 6026,
+      "name": "RevealDeadlinePassed",
+      "msg": "The reveal deadline has passed; only forfeit applies"
+    },
+    {
+      "code": 6027,
+      "name": "DeadlineNotReached",
+      "msg": "The deadline has not passed yet"
+    },
+    {
+      "code": 6028,
+      "name": "OperatorRequired",
+      "msg": "Only the operator can do this in the current phase"
+    },
+    {
+      "code": 6029,
+      "name": "RandomnessNotConfigured",
+      "msg": "The house randomness account is not configured"
+    },
+    {
+      "code": 6030,
+      "name": "InvalidRandomnessAccount",
+      "msg": "The randomness account is not a Switchboard account controlled by this program"
+    },
+    {
+      "code": 6031,
+      "name": "StaleRandomness",
+      "msg": "The randomness does not belong to this round's commit or was not just revealed"
+    },
+    {
+      "code": 6032,
+      "name": "EntropyDeadlinePassed",
+      "msg": "The entropy deadline has passed; only void applies"
+    },
+    {
+      "code": 6033,
+      "name": "InvalidUsername",
+      "msg": "Usernames must be 3-16 characters in [a-z0-9_]"
+    },
+    {
+      "code": 6034,
+      "name": "UsernameCooldown",
+      "msg": "The username was changed too recently"
+    },
+    {
+      "code": 6035,
+      "name": "UsernameRecordMismatch",
+      "msg": "The username record does not match the player's current name"
+    },
+    {
+      "code": 6036,
+      "name": "Unauthorized",
+      "msg": "The signer is neither the player nor a session allowed to do this"
+    },
+    {
+      "code": 6037,
+      "name": "SessionExpired",
+      "msg": "The session has expired"
+    },
+    {
+      "code": 6038,
+      "name": "SessionSpendCapExceeded",
+      "msg": "The session spend cap would be exceeded"
+    },
+    {
+      "code": 6039,
+      "name": "InvalidSession",
+      "msg": "Invalid session key, expiry or spend cap"
+    },
+    {
+      "code": 6040,
+      "name": "NoSession",
+      "msg": "The player has no session"
+    },
+    {
+      "code": 6041,
+      "name": "InsufficientBalance",
+      "msg": "The player balance is insufficient"
+    },
+    {
+      "code": 6042,
+      "name": "PlayerNotEmpty",
+      "msg": "The player still has a balance or a bet in play"
+    },
+    {
+      "code": 6043,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6044,
+      "name": "RulesError",
+      "msg": "Rules error"
+    }
+  ],
+  "types": [
+    {
+      "name": "ActiveBet",
+      "docs": [
+        "A player's bet in play; replaces the v1.1 `Bet` account (spec v2 §3.1)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "stake",
+            "type": "u64"
+          },
+          {
+            "name": "auto_cash_out",
+            "docs": [
+              "Auto cash-out target in ten-thousandths; 0 means none."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "exposure",
+            "type": "u64"
+          },
+          {
+            "name": "cash_out_tick",
+            "type": {
+              "option": "u64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "BankDeposited",
+      "docs": [
+        "Authoritative events: off-chain projections must be rebuildable from these and the `Round` accounts."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BankWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BetOutcome",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "CashedOut"
+          },
+          {
+            "name": "Lost"
+          },
+          {
+            "name": "Refunded"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BetPlaced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "player",
+            "docs": [
+              "Wallet that owns the `Player` account."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "stake",
+            "type": "u64"
+          },
+          {
+            "name": "auto_cash_out",
+            "type": "u64"
+          },
+          {
+            "name": "exposure",
+            "type": "u64"
+          },
+          {
+            "name": "by_session",
+            "type": "bool"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BetSettled",
+      "docs": [
+        "Self-contained record of a bet, so it stays auditable without per-bet accounts (spec v2 §10)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "player",
+            "type": "pubkey"
+          },
+          {
+            "name": "stake",
+            "type": "u64"
+          },
+          {
+            "name": "auto_cash_out",
+            "type": "u64"
+          },
+          {
+            "name": "cash_out_tick",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "BetOutcome"
+              }
+            }
+          },
+          {
+            "name": "multiplier",
+            "type": "u64"
+          },
+          {
+            "name": "payout",
+            "type": "u64"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "total_wagered",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BettingClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "randomness_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "randomness_seed_slot",
+            "type": "u64"
+          },
+          {
+            "name": "entropy_deadline_slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CashOutRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "player",
+            "type": "pubkey"
+          },
+          {
+            "name": "tick",
+            "type": "u64"
+          },
+          {
+            "name": "multiplier",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CoinsBought",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CoinsSold",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HouseConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          },
+          {
+            "name": "rules_version",
+            "type": "u16"
+          },
+          {
+            "name": "limits",
+            "type": {
+              "defined": {
+                "name": "Limits"
+              }
+            }
+          },
+          {
+            "name": "max_bets_per_round",
+            "type": "u32"
+          },
+          {
+            "name": "timeouts",
+            "type": {
+              "defined": {
+                "name": "Timeouts"
+              }
+            }
+          },
+          {
+            "name": "player_policy",
+            "type": {
+              "defined": {
+                "name": "PlayerPolicy"
+              }
+            }
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "next_round_id",
+            "type": "u64"
+          },
+          {
+            "name": "current_round",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "randomness_account",
+            "docs": [
+              "Switchboard randomness account controlled by the `randomness_authority` PDA; default = unset."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "randomness_authority_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HouseVault",
+      "docs": [
+        "Holds the bank and the stakes in play as lamports; `reserved_exposure` covers every active bet.",
+        "Player balances never live here: they stay in each `Player` PDA."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "reserved_exposure",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Limits",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "min_stake",
+            "type": "u64"
+          },
+          {
+            "name": "max_stake",
+            "type": "u64"
+          },
+          {
+            "name": "max_payout",
+            "type": "u64"
+          },
+          {
+            "name": "max_round_exposure",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Player",
+      "docs": [
+        "Per-wallet account. Its lamports hold `balance` on top of its rent (spec v2 §3.1)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "username",
+            "type": {
+              "defined": {
+                "name": "Username"
+              }
+            }
+          },
+          {
+            "name": "username_changed_slot",
+            "type": "u64"
+          },
+          {
+            "name": "balance",
+            "docs": [
+              "Free lamports the player can bet or sell; the stake in play is in the vault."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "active_bet",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "ActiveBet"
+                }
+              }
+            }
+          },
+          {
+            "name": "session",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Session"
+                }
+              }
+            }
+          },
+          {
+            "name": "total_wagered",
+            "docs": [
+              "Stakes settled in `Crashed` rounds, in lamports: the source of experience."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bets_settled",
+            "type": "u64"
+          },
+          {
+            "name": "created_slot",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlayerClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlayerPolicy",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_session_slots",
+            "docs": [
+              "Longest session a player may open, counted from the creation slot."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "username_cooldown_slots",
+            "docs": [
+              "Minimum slots between two username changes (0 = no cooldown)."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlayerRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "username",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RandomnessAccountSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "randomness_account",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Round",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "rules_version",
+            "type": "u16"
+          },
+          {
+            "name": "phase",
+            "type": {
+              "defined": {
+                "name": "RoundPhase"
+              }
+            }
+          },
+          {
+            "name": "commit",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "opened_slot",
+            "type": "u64"
+          },
+          {
+            "name": "betting_end_slot",
+            "type": "u64"
+          },
+          {
+            "name": "entropy_deadline_slot",
+            "type": "u64"
+          },
+          {
+            "name": "randomness_account",
+            "docs": [
+              "Switchboard account and commit slot fixed by `close_betting`; `start_round` must match them."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "randomness_seed_slot",
+            "type": "u64"
+          },
+          {
+            "name": "start_slot",
+            "type": "u64"
+          },
+          {
+            "name": "reveal_deadline_slot",
+            "type": "u64"
+          },
+          {
+            "name": "vrf_output",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "seed",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "crash_point",
+            "type": "u64"
+          },
+          {
+            "name": "crash_tick",
+            "type": "u64"
+          },
+          {
+            "name": "total_exposure",
+            "type": "u64"
+          },
+          {
+            "name": "bet_count",
+            "type": "u32"
+          },
+          {
+            "name": "settled_count",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoundForfeited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoundOpened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "commit",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "betting_end_slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoundPhase",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Betting"
+          },
+          {
+            "name": "AwaitingEntropy"
+          },
+          {
+            "name": "Running"
+          },
+          {
+            "name": "Crashed"
+          },
+          {
+            "name": "Settled"
+          },
+          {
+            "name": "Voided"
+          },
+          {
+            "name": "Forfeited"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoundRevealed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "seed",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "vrf_output",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "crash_point",
+            "type": "u64"
+          },
+          {
+            "name": "crash_tick",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoundStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          },
+          {
+            "name": "vrf_output",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "start_slot",
+            "type": "u64"
+          },
+          {
+            "name": "reveal_deadline_slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoundVoided",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "round_id",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Session",
+      "docs": [
+        "Browser key allowed to bet and cash out for the player (spec v2 §4)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "key",
+            "type": "pubkey"
+          },
+          {
+            "name": "expires_slot",
+            "type": "u64"
+          },
+          {
+            "name": "spend_cap",
+            "type": "u64"
+          },
+          {
+            "name": "spent",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SessionCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "key",
+            "type": "pubkey"
+          },
+          {
+            "name": "expires_slot",
+            "type": "u64"
+          },
+          {
+            "name": "spend_cap",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SessionRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "key",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Timeouts",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "betting_slots",
+            "type": "u64"
+          },
+          {
+            "name": "entropy_timeout_slots",
+            "type": "u64"
+          },
+          {
+            "name": "reveal_grace_slots",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Username",
+      "docs": [
+        "Validated username: 3–16 bytes in `[a-z0-9_]`; `len = 0` means no name (spec v2 §3.3)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "len",
+            "type": "u8"
+          },
+          {
+            "name": "bytes",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UsernameChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "old",
+            "type": "string"
+          },
+          {
+            "name": "new",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UsernameRecord",
+      "docs": [
+        "Makes a username unique: the account exists iff the name is taken."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UsernameReset",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "old",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ],
+  "constants": [
+    {
+      "name": "HOUSE_SEED",
+      "type": "bytes",
+      "value": "[104, 111, 117, 115, 101]"
+    },
+    {
+      "name": "PLAYER_SEED",
+      "type": "bytes",
+      "value": "[112, 108, 97, 121, 101, 114]"
+    },
+    {
+      "name": "RANDOMNESS_AUTHORITY_SEED",
+      "docs": [
+        "PDA that owns the house's Switchboard randomness account (ADR 0002, final decision 2)."
+      ],
+      "type": "bytes",
+      "value": "[114, 97, 110, 100, 111, 109, 110, 101, 115, 115, 95, 97, 117, 116, 104, 111, 114, 105, 116, 121]"
+    },
+    {
+      "name": "ROUND_SEED",
+      "type": "bytes",
+      "value": "[114, 111, 117, 110, 100]"
+    },
+    {
+      "name": "USERNAME_SEED",
+      "type": "bytes",
+      "value": "[117, 115, 101, 114, 110, 97, 109, 101]"
+    },
+    {
+      "name": "VAULT_SEED",
+      "type": "bytes",
+      "value": "[118, 97, 117, 108, 116]"
+    }
+  ]
+}

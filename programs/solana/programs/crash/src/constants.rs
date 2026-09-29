@@ -7,7 +7,13 @@ pub const VAULT_SEED: &[u8] = b"vault";
 #[constant]
 pub const ROUND_SEED: &[u8] = b"round";
 #[constant]
-pub const BET_SEED: &[u8] = b"bet";
+pub const PLAYER_SEED: &[u8] = b"player";
+#[constant]
+pub const USERNAME_SEED: &[u8] = b"username";
+
+/// Username bounds in bytes; each byte must be in `[a-z0-9_]` (spec v2 §3.3).
+pub const USERNAME_MIN_LEN: usize = 3;
+pub const USERNAME_MAX_LEN: usize = 16;
 
 /// Domain-separation tags for the randomness scheme (ADR 0002, spec §6).
 pub const COMMIT_TAG: &[u8] = b"crash/v1/commit";

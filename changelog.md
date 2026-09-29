@@ -138,3 +138,76 @@
   - La experiencia es on-chain (`total_wagered`, solo en rondas `Crashed`), porque los niveles darán ventajas económicas. Cualquier ventaja futura necesitará su propia spec y el invariante de que su valor esperado por unidad apostada sea menor que el edge.
   - El chat necesitará una base de datos, que se decidirá en un ADR aparte; nunca será autoridad sobre saldos, apuestas, experiencia ni nombres.
   - Preguntas abiertas: cómo se pagan las comisiones de la sesión, los saldos en USDC, los valores por defecto de la sesión, la política de cambio de nombre y el cierre de cuentas.
+
+## 2026-09-29
+
+- **ADR 0003 aceptado** con todas las propuestas: la wallet envía un presupuesto de comisiones a la clave de sesión; en el futuro, USDC tendrá un saldo separado; sesión de 24 h por defecto (7 días como máximo); 7 días entre cambios de nombre; `close_player` permitido aunque se pierda la experiencia. Una precisión: una sesión caducada todavía puede hacer cash-out y revocarse, porque no compromete fondos.
+- **Spec del programa v2** en borrador, pendiente de aprobación ([`docs/specs/crash-program-v2.md`](docs/specs/crash-program-v2.md)). Todavía no hay código.
+  - Cuentas nuevas `Player` (saldo, apuesta en curso, sesión y experiencia) y `UsernameRecord` (unicidad del nombre). Se eliminan `Bet` y `close_bet`.
+  - Instrucciones nuevas: registro, compra y venta de monedas, sesiones, cambio y reset de nombre, y cierre de cuenta. `place_bet`, `cash_out` y `settle_bet` pasan a trabajar con el saldo de `Player`.
+  - La pausa bloquea las entradas (apostar, registrarse, comprar, abrir sesión) y nunca las salidas (vender, hacer cash-out, liquidar, revocar, cerrar).
+  - 7 invariantes nuevos: fondos del jugador separados del vault, conservación, sesión acotada, experiencia solo en rondas `Crashed` y unicidad del nombre.
+  - **Compatibilidad:** cambia el layout de `HouseConfig` y desaparece `Bet`. Se propone desplegar v2 con un program id nuevo en devnet; el programa v1.1 se conserva para que sus rondas sigan siendo verificables.
+- **Programa v2 implementado** ([spec v2](docs/specs/crash-program-v2.md), aprobada) y probado en LiteSVM; **todavía no desplegado**.
+  - Cuentas nuevas `Player` (saldo en lamports dentro de su propia PDA, apuesta en curso, sesión, nombre y experiencia) y `UsernameRecord` (nombre único). Se eliminan la cuenta `Bet` y `close_bet`.
+  - Instrucciones nuevas: `register_player`, `buy_coins`, `sell_coins`, `create_session`, `revoke_session`, `change_username`, `reset_username` y `close_player`. `place_bet` y `cash_out` aceptan al dueño o a su clave de sesión, y `settle_bet` paga al saldo de `Player` y suma experiencia solo en rondas `Crashed`.
+  - `HouseConfig` gana `player_policy` (sesión máxima y enfriamiento del nombre, ambos 1 512 000 slots ≈ 7 días). Eventos nuevos de jugador; `BetSettled` pasa a ser un registro completo de la apuesta.
+  - **Compatibilidad:** nuevo program id `DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM`, que ya está en `declare_id!` y `Anchor.toml`, para que el código nuevo no pueda desplegarse sobre la casa v1.1 (`384Cf…`), que sigue en devnet. El keypair de v1.1 se conserva fuera del repo.
+  - Pruebas: 19 LiteSVM, que cubren la sesión y sus límites exactos, los nombres, compra y venta, las apuestas contra el saldo, void y forfeit sin experiencia, un `Player` falsificado y la pausa con las salidas abiertas. Los invariantes de solvencia, de fondos del jugador y de unicidad del nombre se comprueban tras cada transacción. En total 38 pruebas Rust en verde; `clippy` sin avisos.
+  - No se ejecutó `cargo audit` (no instalado). Las dependencias Rust no cambian y el código TypeScript no se tocó.
+- **Programa v2 desplegado en devnet** en `DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM`. El binario on-chain coincide con el local (SHA-256) y la autoridad de upgrade es `3R48…`. Casa nueva con un bank de 0.3 SOL y cuenta de randomness de Switchboard `3gNTQ…` con authority PDA. Detalle en la spec v2, §15.
+- **Casa v1.1 retirada:** sin ronda activa ni apuestas; se retiraron sus 0.2507 SOL de bank. El programa `384Cf…` sigue desplegado para que sus rondas se puedan seguir consultando.
+- **Prueba end-to-end de v2 contra el Switchboard real:**
+  - alta de dos jugadores con una sola firma de wallet cada uno;
+  - todas las apuestas y los cash-outs los firmó la clave de sesión;
+  - 9 rondas reveladas (1.02x–9.45x), todas idénticas a un verificador independiente;
+  - 19 liquidaciones verificadas sin discrepancias, incluido el reembolso de una ronda anulada;
+  - experiencia solo en rondas `Crashed`;
+  - intentos adversariales rechazados (una sesión vendiendo, el operador apostando con el saldo de un jugador);
+  - salida completa con cuentas cerradas.
+- **Hallazgo:** con la RPC pública (HTTP 429), la ventana de apuestas de 25 slots (≈ 10 s) es justa. Una apuesta tardía fue rechazada correctamente (`BettingClosed`). El cliente debe preparar las transacciones antes de que abra la ronda. Queda abierto ampliar `betting_slots` (configurable sin redesplegar).
+- **Timeouts de la casa de devnet ampliados** con `update_config`, sin redesplegar:
+  - `betting_slots`: de 25 a 50 (≈ 20 s), para que las apuestas lleguen a tiempo aunque la RPC limite la tasa;
+  - `entropy_timeout_slots`: de 150 a 300, para reducir las anulaciones por caídas del gateway de Switchboard.
+
+  `reveal_grace_slots` sigue en 150 y el resto de la configuración no cambia. Consecuencia: cada ronda tarda unos 10 s más en empezar, y en el peor caso los jugadores esperan unos 2 minutos antes de que una ronda sin entropía pueda anularse y reembolsarse.
+- **Revisión previa a la versión funcional mínima.** Todo en verde: JS (151 pruebas, lint, typecheck) y Rust (38 pruebas, `fmt`). `pnpm audit` solo muestra las 2 moderadas transitivas conocidas. Corregidos los estados de las specs: v2 es la vigente y v1.1 queda como histórico del programa retirado.
+- **Spec del cliente y del crank en borrador, pendiente de aprobación** ([`docs/specs/crash-client-v1.md`](docs/specs/crash-client-v1.md)). Todavía no hay código. No cambia el programa ni las reglas.
+  - Codec TS propio del programa, probado contra el IDL versionado.
+  - Crank del operador en Node (`services/operator/`): ciclo completo de la ronda, semillas guardadas en disco fuera del repo y recuperación tras reinicio.
+  - Switchboard off-chain sin su SDK: elección del oráculo y reveal por el gateway. El gateway recibe siempre la RPC pública.
+  - Web: ronda en vivo como proyección etiquetada, alta con una sola firma y apuestas y cash-outs firmados por la clave de sesión guardada en `localStorage`.
+  - History (rondas y apuestas propias desde los eventos) y Fairness (verificación en el navegador con el motor TS).
+- **Versión funcional mínima en devnet** ([spec del cliente v1](docs/specs/crash-client-v1.md), aprobada e implementada). No cambia el programa ni las reglas.
+  - **Codec TS propio** del programa, guiado por el IDL versionado (`src/chain-adapters/solana/crash-program/idl/crash.json`). Verifica owner, discriminador y longitud de cada cuenta, y solo acepta eventos emitidos por el propio programa. Se prueba contra cuentas y logs reales de devnet.
+  - **Crank del operador** (`pnpm operator`, en `services/operator/`): abre, cierra, arranca, revela y liquida rondas sin intervención.
+    - Las semillas se guardan con `fsync` fuera del repo antes de comprometerlas y nunca se sobrescriben.
+    - Se recupera tras un reinicio en cualquier fase: anula si le falta la semilla y nunca arranca una ronda que no podría revelar.
+    - Se niega a arrancar con claves o semillas dentro del repo o con una RPC que no sea devnet.
+  - **Switchboard off-chain sin su SDK:** elección del oráculo (en la cola, verificado, con heartbeat y cotización vigentes) y reveal por el gateway, enviando siempre la RPC pública.
+  - **Web:**
+    - **Crash:** ronda en vivo, con el multiplicador etiquetado como estimado y el crash point siempre el revelado on-chain.
+    - **Cuenta:** alta con una firma (nombre, monedas y sesión de 24 h). La clave de sesión vive en `localStorage` y su riesgo está acotado por `spend_cap` + fee budget. Comprar monedas renueva el tope de la sesión. Apuestas y cash-outs firmados por la sesión; venta y salida completa.
+    - **History:** rondas y apuestas propias desde los eventos `BetSettled`.
+    - **Fairness:** verificación en el navegador de cualquier ronda, que declara de forma visible las rondas no verificables.
+  - **Arquitectura:** puertos `CrashGamePort` y `PlayerAccountPort` sin dependencia de la cadena. `src/app/(dashboard)/crash-runtime.tsx` los conecta al adaptador Solana, y `chain-adapters` no importa de `games`.
+  - **Dependencias:** `buffer` y `vite` pasan a ser directas (ya estaban en el lockfile; sin paquetes nuevos). Se elimina `chain-adapters/solana/assets.ts`, que no se usaba: USDC llegará con su propia spec.
+  - **RPC:** su estado distingue ahora `rate-limited` (429) de `unreachable`.
+  - **Robustez frente a la RPC pública**, corregida durante la prueba en devnet:
+    - las transacciones (web y crank) se confirman consultando el estado de la firma, sin WebSocket, y los errores transitorios no las marcan como rechazadas;
+    - `confirmTransaction` de web3.js dejaba un rechazo sin capturar que tumbó el crank. Ahora se usa la confirmación por sondeo, y el crank registra cualquier rechazo no capturado y sigue, porque cada decisión se vuelve a derivar de la cadena;
+    - History pide las transacciones de una en una y con reintentos: la forma por lotes (`getTransactions`) la rechaza la RPC pública;
+    - la web consulta el estado en una sola petición por segundo, en lugar de con suscripciones.
+  - El coste de alta que muestra la web usa el rent real que devuelve la RPC, no una tarifa fija, que lo sobreestimaba.
+  - El jugador E2E es reanudable: guarda sus claves desechables en `CRASH_OPERATOR_STATE_DIR` y solo las borra cuando se confirma la devolución de los fondos al operador.
+  - **Pruebas:** 220 en Vitest (antes 151).
+  - **Devnet:**
+    - el crank completó las rondas 11–41, incluido un reinicio a mitad de ronda;
+    - el jugador E2E (`pnpm operator:e2e`) hizo 7 apuestas por sesión (cash-out manual, auto y sin cash-out) con 0 discrepancias frente al motor, todas las rondas verificadas y salida completa;
+    - no hay semillas ni VRF repetidos.
+  - **Riesgos y costes conocidos:**
+    - cada ronda deja una cuenta `Round` con ≈ 0.0018 SOL de rent que no se recupera (no existe `close_round`): ≈ 0.16 SOL/hora con el crank en marcha continua;
+    - la RPC pública limita la tasa (429);
+    - falta probar la web con una wallet real de navegador;
+    - ≈ 0.093 SOL de devnet quedaron en claves E2E desechables perdidas antes de hacer reanudable el script.
+  - **Estado al cerrar la sesión:** el crank está parado. La ronda 41 quedó abierta con su semilla guardada fuera del repo, así que el próximo arranque la retoma o la anula sin pérdidas. El saldo del operador es de 2.21 SOL.

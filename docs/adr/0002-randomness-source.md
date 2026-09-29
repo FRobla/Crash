@@ -104,5 +104,5 @@ Se basa en los datos medidos en el [spike](../spikes/vrf-devnet.md): 100/100 ron
 
 1. Proveedor VRF: **Switchboard On-Demand** (decisión final, punto 1).
 2. Hash chain o compromiso por ronda: **compromiso independiente por ronda** para el MVP. La hash chain queda como mejora opcional.
-3. Timeouts en slots: `betting_slots = 25`, `entropy_timeout_slots = 150` (5x el máximo medido), `reveal_grace_slots = 150`. Configurables en `HouseConfig`.
+3. Timeouts en slots: `betting_slots = 25`, `entropy_timeout_slots = 150` (5x el máximo medido), `reveal_grace_slots = 150`. Configurables en `HouseConfig`. **Actualizado el 2026-09-29:** `betting_slots = 50` y `entropy_timeout_slots = 300`, por las anulaciones de la fase 3 del spike (caídas del gateway) y por apuestas que llegaban tarde con la RPC pública; `reveal_grace_slots` sigue en 150.
 4. Riesgo de colusión: **aceptado para el MVP en devnet**. Antes de fondos reales se reevalúa la custodia de `s` en TEE o por umbral.

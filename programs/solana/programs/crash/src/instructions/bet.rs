@@ -1,38 +1,31 @@
 use anchor_lang::prelude::*;
-use anchor_lang::system_program;
 
 use crate::{
     constants::*,
     error::CrashError,
     events::{BetPlaced, BetSettled, CashOutRecorded},
-    state::{Bet, BetOutcome, BetStatus, HouseConfig, HouseVault, Round, RoundPhase},
-    vault::require_covers,
+    state::{
+        ActiveBet, BetOutcome, HouseConfig, HouseVault, Player, PlayerSigner, Round, RoundPhase,
+    },
+    vault::{require_covers, require_player_funded},
 };
 
 #[derive(Accounts)]
 #[instruction(round_id: u64)]
 pub struct PlaceBet<'info> {
-    #[account(mut)]
-    pub player: Signer<'info>,
+    /// The player's wallet or its session key (spec v2 §4).
+    pub signer: Signer<'info>,
     #[account(seeds = [HOUSE_SEED], bump = config.bump)]
     pub config: Account<'info, HouseConfig>,
     #[account(mut, seeds = [VAULT_SEED], bump = vault.bump)]
     pub vault: Account<'info, HouseVault>,
     #[account(mut, seeds = [ROUND_SEED, round_id.to_le_bytes().as_ref()], bump = round.bump)]
     pub round: Account<'info, Round>,
-    /// `init` makes a second bet by the same player in the same round fail.
-    #[account(
-        init,
-        payer = player,
-        space = 8 + Bet::INIT_SPACE,
-        seeds = [BET_SEED, round_id.to_le_bytes().as_ref(), player.key().as_ref()],
-        bump
-    )]
-    pub bet: Account<'info, Bet>,
-    pub system_program: Program<'info, System>,
+    #[account(mut, seeds = [PLAYER_SEED, player.owner.as_ref()], bump = player.bump)]
+    pub player: Account<'info, Player>,
 }
 
-/// `auto_cash_out = 0` means no auto cash-out.
+/// Moves the stake from the player's balance to the vault. `auto_cash_out = 0` means none.
 pub fn handle_place_bet(
     ctx: Context<PlaceBet>,
     round_id: u64,
@@ -41,16 +34,32 @@ pub fn handle_place_bet(
 ) -> Result<()> {
     let config = &ctx.accounts.config;
     let round = &mut ctx.accounts.round;
+    let player = &mut ctx.accounts.player;
+    let slot = Clock::get()?.slot;
     require!(!config.paused, CrashError::Paused);
     require!(round.phase == RoundPhase::Betting, CrashError::InvalidPhase);
-    require!(
-        Clock::get()?.slot < round.betting_end_slot,
-        CrashError::BettingClosed
-    );
+    require!(slot < round.betting_end_slot, CrashError::BettingClosed);
     require!(
         round.bet_count < config.max_bets_per_round,
         CrashError::TooManyBets
     );
+
+    let by_session = player.signer_role(&ctx.accounts.signer.key())? == PlayerSigner::Session;
+    if by_session {
+        let session = player.session.as_mut().ok_or(CrashError::NoSession)?;
+        require!(slot <= session.expires_slot, CrashError::SessionExpired);
+        let spent = session
+            .spent
+            .checked_add(stake)
+            .ok_or(CrashError::ArithmeticOverflow)?;
+        require!(
+            spent <= session.spend_cap,
+            CrashError::SessionSpendCapExceeded
+        );
+        session.spent = spent;
+    }
+    require!(player.active_bet.is_none(), CrashError::ActiveBetPending);
+    require!(stake <= player.balance, CrashError::InsufficientBalance);
 
     let rules =
         crash_rules::rules_for_version(round.rules_version).ok_or(CrashError::RulesError)?;
@@ -67,11 +76,22 @@ pub fn handle_place_bet(
         CrashError::RoundExposureExceeded
     );
 
-    let accounts = system_program::Transfer {
-        from: ctx.accounts.player.to_account_info(),
-        to: ctx.accounts.vault.to_account_info(),
-    };
-    system_program::transfer(CpiContext::new(system_program::ID, accounts), stake)?;
+    player.balance -= stake;
+    player.active_bet = Some(ActiveBet {
+        round_id,
+        stake,
+        auto_cash_out,
+        exposure,
+        cash_out_tick: None,
+    });
+    round.total_exposure = total_exposure;
+    round.bet_count += 1;
+    let (owner, balance) = (player.owner, player.balance);
+
+    // Both accounts belong to the program: lamports move directly, without a CPI.
+    ctx.accounts.player.sub_lamports(stake)?;
+    ctx.accounts.vault.add_lamports(stake)?;
+    require_player_funded(&ctx.accounts.player.to_account_info(), balance)?;
 
     let vault = &mut ctx.accounts.vault;
     vault.reserved_exposure = vault
@@ -80,54 +100,36 @@ pub fn handle_place_bet(
         .ok_or(CrashError::ArithmeticOverflow)?;
     require_covers(&vault.to_account_info(), vault.reserved_exposure)?;
 
-    round.total_exposure = total_exposure;
-    round.bet_count += 1;
-    ctx.accounts.bet.set_inner(Bet {
+    emit!(BetPlaced {
         round_id,
-        player: ctx.accounts.player.key(),
+        player: owner,
         stake,
         auto_cash_out,
         exposure,
-        cash_out_tick: None,
-        status: BetStatus::Active,
-        outcome: BetOutcome::Pending,
-        settled_multiplier: 0,
-        payout: 0,
-        bump: ctx.bumps.bet,
-    });
-    emit!(BetPlaced {
-        round_id,
-        player: ctx.accounts.player.key(),
-        stake,
-        auto_cash_out,
-        exposure
+        by_session,
+        balance
     });
     Ok(())
 }
 
 #[derive(Accounts)]
 pub struct CashOut<'info> {
-    pub player: Signer<'info>,
+    /// The player's wallet or its session key, even if expired (spec v2 §4).
+    pub signer: Signer<'info>,
     #[account(seeds = [ROUND_SEED, round.round_id.to_le_bytes().as_ref()], bump = round.bump)]
     pub round: Account<'info, Round>,
-    #[account(
-        mut,
-        seeds = [BET_SEED, round.round_id.to_le_bytes().as_ref(), player.key().as_ref()],
-        bump = bet.bump,
-        has_one = player
-    )]
-    pub bet: Account<'info, Bet>,
+    #[account(mut, seeds = [PLAYER_SEED, player.owner.as_ref()], bump = player.bump)]
+    pub player: Account<'info, Player>,
 }
 
 /// Records the authoritative tick (slot of inclusion); it pays nothing while the crash point is secret.
 pub fn handle_cash_out(ctx: Context<CashOut>) -> Result<()> {
     let round = &ctx.accounts.round;
-    let bet = &mut ctx.accounts.bet;
+    let player = &mut ctx.accounts.player;
+    player.signer_role(&ctx.accounts.signer.key())?;
     require!(round.phase == RoundPhase::Running, CrashError::InvalidPhase);
-    require!(
-        bet.status == BetStatus::Active,
-        CrashError::BetAlreadySettled
-    );
+    let bet = player.active_bet.as_mut().ok_or(CrashError::NoActiveBet)?;
+    require!(bet.round_id == round.round_id, CrashError::BetRoundMismatch);
     require!(bet.cash_out_tick.is_none(), CrashError::AlreadyCashedOut);
 
     let rules =
@@ -145,7 +147,7 @@ pub fn handle_cash_out(ctx: Context<CashOut>) -> Result<()> {
     bet.cash_out_tick = Some(tick);
     emit!(CashOutRecorded {
         round_id: round.round_id,
-        player: bet.player,
+        player: player.owner,
         tick,
         multiplier
     });
@@ -158,26 +160,17 @@ pub struct SettleBet<'info> {
     pub round: Account<'info, Round>,
     #[account(mut, seeds = [VAULT_SEED], bump = vault.bump)]
     pub vault: Account<'info, HouseVault>,
-    #[account(
-        mut,
-        seeds = [BET_SEED, round.round_id.to_le_bytes().as_ref(), player.key().as_ref()],
-        bump = bet.bump,
-        has_one = player
-    )]
-    pub bet: Account<'info, Bet>,
-    /// Payouts can only go to the bet's player.
-    #[account(mut)]
-    pub player: SystemAccount<'info>,
+    /// Payouts can only go to the `Player` account that owns the bet.
+    #[account(mut, seeds = [PLAYER_SEED, player.owner.as_ref()], bump = player.bump)]
+    pub player: Account<'info, Player>,
 }
 
 /// Permissionless (an operator crank normally calls it); mirrors `settleRound` for one bet.
 pub fn handle_settle_bet(ctx: Context<SettleBet>) -> Result<()> {
     let round = &mut ctx.accounts.round;
-    let bet = &mut ctx.accounts.bet;
-    require!(
-        bet.status == BetStatus::Active,
-        CrashError::BetAlreadySettled
-    );
+    let player = &mut ctx.accounts.player;
+    let bet = player.active_bet.ok_or(CrashError::NoActiveBet)?;
+    require!(bet.round_id == round.round_id, CrashError::BetRoundMismatch);
 
     let rules =
         crash_rules::rules_for_version(round.rules_version).ok_or(CrashError::RulesError)?;
@@ -209,11 +202,32 @@ pub fn handle_settle_bet(ctx: Context<SettleBet>) -> Result<()> {
     // Defense in depth: the reserved exposure bounds every possible payout.
     require!(payout <= bet.exposure, CrashError::ArithmeticOverflow);
 
-    bet.status = BetStatus::Settled;
-    bet.outcome = result;
-    bet.settled_multiplier = multiplier;
-    bet.payout = payout;
+    player.active_bet = None;
+    player.balance = player
+        .balance
+        .checked_add(payout)
+        .ok_or(CrashError::ArithmeticOverflow)?;
+    // Only revealed rounds earn experience; void and forfeit refunds carry no risk (ADR 0003 §5).
+    if round.phase == RoundPhase::Crashed {
+        player.total_wagered = player
+            .total_wagered
+            .checked_add(bet.stake)
+            .ok_or(CrashError::ArithmeticOverflow)?;
+        player.bets_settled += 1;
+    }
     round.settled_count += 1;
+    let event = BetSettled {
+        round_id: round.round_id,
+        player: player.owner,
+        stake: bet.stake,
+        auto_cash_out: bet.auto_cash_out,
+        cash_out_tick: bet.cash_out_tick,
+        outcome: result,
+        multiplier,
+        payout,
+        balance: player.balance,
+        total_wagered: player.total_wagered,
+    };
     if round.phase == RoundPhase::Crashed && round.settled_count == round.bet_count {
         round.phase = RoundPhase::Settled;
     }
@@ -227,36 +241,12 @@ pub fn handle_settle_bet(ctx: Context<SettleBet>) -> Result<()> {
         vault.sub_lamports(payout)?;
         ctx.accounts.player.add_lamports(payout)?;
     }
-    require_covers(&vault.to_account_info(), vault.reserved_exposure)?;
+    require_covers(
+        &ctx.accounts.vault.to_account_info(),
+        ctx.accounts.vault.reserved_exposure,
+    )?;
+    require_player_funded(&ctx.accounts.player.to_account_info(), event.balance)?;
 
-    emit!(BetSettled {
-        round_id: round.round_id,
-        player: bet.player,
-        outcome: result,
-        multiplier,
-        payout
-    });
-    Ok(())
-}
-
-#[derive(Accounts)]
-pub struct CloseBet<'info> {
-    #[account(
-        mut,
-        seeds = [BET_SEED, bet.round_id.to_le_bytes().as_ref(), player.key().as_ref()],
-        bump = bet.bump,
-        has_one = player,
-        close = player
-    )]
-    pub bet: Account<'info, Bet>,
-    #[account(mut)]
-    pub player: SystemAccount<'info>,
-}
-
-pub fn handle_close_bet(ctx: Context<CloseBet>) -> Result<()> {
-    require!(
-        ctx.accounts.bet.status == BetStatus::Settled,
-        CrashError::InvalidPhase
-    );
+    emit!(event);
     Ok(())
 }

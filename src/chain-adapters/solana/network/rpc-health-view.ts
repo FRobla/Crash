@@ -5,5 +5,6 @@ export const RPC_HEALTH_VIEW: Record<RpcHealth, { label: string; tone: StatusTon
   checking: { label: "checking", tone: "warn" },
   ok: { label: "ok", tone: "ok" },
   "wrong-network": { label: "wrong network", tone: "danger" },
+  "rate-limited": { label: "rate-limited", tone: "warn" },
   unreachable: { label: "unreachable", tone: "danger" },
 };

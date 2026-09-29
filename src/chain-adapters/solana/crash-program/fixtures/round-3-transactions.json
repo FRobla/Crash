@@ -1,0 +1,124 @@
+[
+ {
+  "signature": "pmxPmVtNsr55axFJU5hs9pApNKe7eCic7PDnzJLoZ8bDYqDPEtm9cDyFAST1XoXeKNQUXqd5K8KraJ7W1hQGSn5",
+  "err": null,
+  "logs": [
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: OpenRound",
+   "Program 11111111111111111111111111111111 invoke [2]",
+   "Program 11111111111111111111111111111111 success",
+   "Program data: Y63kSI45bbIDAAAAAAAAAEKpFtL3J0G0e3XT0YHfYvSGMPP/DQP6C0fLDiWs6vR63nYeHgAAAAA=",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 11561 of 200000 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success"
+  ]
+ },
+ {
+  "signature": "c5VjJhj1qw8rRpyAmWSMopnVwf5w1vSsqCbwEWi4AZw4vwWKoUZZebi7nYZioLLD1zi2ugwonKoPscvhmF7CdPe",
+  "err": null,
+  "logs": [
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: PlaceBet",
+   "Program data: WFiR4n7OIAADAAAAAAAAAHjU2H+nW7x4C7IN97wito4Z9G56f9v9xdcyl1vx+AoAgIQeAAAAAAAAAAAAAAAAAADC6wsAAAAAAYBzBgEAAAAA",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 14847 of 200000 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success"
+  ]
+ },
+ {
+  "signature": "2CZv2gybyHP2fsZx3uPg3uu4JCFhqNkQzNG9hT6yvbMXkAGFbp1ChgEyiL3B9NxHPYrFVrDDE8YroUuNxZchgGJX",
+  "err": null,
+  "logs": [
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: SettleBet",
+   "Program data: OZHgoD53484CAAAAAAAAADj5PNoYGA/y/AqBCpE6cjAvBORKvrhAW1NsDGA5oCUBQEIPAAAAAAAgTgAAAAAAAAAAIE4AAAAAAACAhB4AAAAAAAAtMQEAAAAAgIQeAAAAAAA=",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 28883 of 400000 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: PlaceBet",
+   "Program data: WFiR4n7OIAADAAAAAAAAADj5PNoYGA/y/AqBCpE6cjAvBORKvrhAW1NsDGA5oCUBQEIPAAAAAAAgTgAAAAAAAICEHgAAAAAAAcDqIQEAAAAA",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 14857 of 371117 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success"
+  ]
+ },
+ {
+  "signature": "4VJVyp4F6YQWWsB1vkrkbHDyDGjKChxtm6gURJrEMbrbN87t5TGGzVpRP4aXwANYXpV4MYDt4h1wDEYwAvqRSgLU",
+  "err": null,
+  "logs": [
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: CloseBetting",
+   "Program Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2 invoke [2]",
+   "Program log: Instruction: RandomnessCommit",
+   "Program log: SEED_SLOT: 505313002",
+   "Program log: SEED_SLOTHASH: [181, 247, 32, 10, 108, 137, 89, 178, 79, 193, 141, 60, 88, 249, 247, 138, 247, 252, 25, 110, 182, 52, 45, 92, 46, 23, 30, 27, 56, 192, 102, 157]",
+   "Program data: WDysWnAKzpMnzUj43+XOk/WQO0eSattuzglCIqAAIH9cnQ/6E/mC/Pcutj8cdWwk1xjR+0xNoiA/qeiLOvzFSezn70vedm+d6nYeHgAAAAC19yAKbIlZsk/BjTxY+feK9/wZbrY0LVwuFx4bOMBmnQ==",
+   "Program Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2 consumed 14863 of 189016 compute units",
+   "Program Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2 success",
+   "Program data: F7id9EEsmEYDAAAAAAAAACfNSPjf5c6T9ZA7R5Jq227OCUIioAAgf1ydD/oT+YL86nYeHgAAAACBdx4eAAAAAA==",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 27785 of 200000 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success"
+  ]
+ },
+ {
+  "signature": "4d1a9qe76KmaKcu1Ncwk9KB7HFs2QiupnZM3N2Tc27iDNc4LBdff65ZGSv7eaopht9F7Ua3fnktVUuJDyTr6mWtJ",
+  "err": null,
+  "logs": [
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: StartRound",
+   "Program Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2 invoke [2]",
+   "Program log: Instruction: RandomnessReveal",
+   "Program Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2 consumed 46675 of 185637 compute units",
+   "Program Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2 success",
+   "Program data: tNEC9O4wqngDAAAAAAAAAFYZkGwoU8LdNoPkgaNcXqwZfk/BQhXUjr/sMQ/QkNlV+HYeHgAAAABSeB4eAAAAAA==",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 100142 of 200000 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success"
+  ]
+ },
+ {
+  "signature": "GHD8KH5YWdSzkZnhsZJGqdpXzR62vDTLUp8mP7nGpvtLuxUqSnF9beY615ME2g4zoMwkbnMGLEeKeY4hswCibNj",
+  "err": null,
+  "logs": [
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: CashOut",
+   "Program data: y9lyrQo15PADAAAAAAAAAHjU2H+nW7x4C7IN97wito4Z9G56f9v9xdcyl1vx+AoAFQAAAAAAAAAQQAAAAAAAAA==",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 11270 of 200000 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success"
+  ]
+ },
+ {
+  "signature": "6151PfsfJXABZTCkyNyt6KhymFikurnDZC3qVBEdfCW3uQQndKMj47kWSYX2EtoYKZUsxVjs43cf6tAxLAH8hkGX",
+  "err": null,
+  "logs": [
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: Reveal",
+   "Program data: Y9V2BTfTOUcDAAAAAAAAALqDiiE8/wR57/+V8bpj21q23XF0H+fZrTln+YY1kunlVhmQbChTwt02g+SBo1xerBl+T8FCFdSOv+wxD9CQ2VUkcQEAAAAAAF8AAAAAAAAA",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 27020 of 200000 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success"
+  ]
+ },
+ {
+  "signature": "MmyL4uLA7LpgYGmecsNcJ9Eqx16XgkeBQD2PPSvGmWA3QqJY9DX4tgCq9GDTX9xS8rBzsgsfGwdFVHeJrvZPiE2",
+  "err": null,
+  "logs": [
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: SettleBet",
+   "Program data: OZHgoD53484DAAAAAAAAAHjU2H+nW7x4C7IN97wito4Z9G56f9v9xdcyl1vx+AoAgIQeAAAAAAAAAAAAAAAAAAEVAAAAAAAAAAAQQAAAAAAAAIAMMgAAAAAAAIA4AQAAAACAjVsAAAAAAA==",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 33873 of 200000 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success"
+  ]
+ },
+ {
+  "signature": "4nCAKLX7u8qDZwxv3jGabscxdjdv4mim7SPezaBkshmy9YcnuT6yhe2A3L5YGdLgNmNBpcYw7XSJiKW9qMHxAWU5",
+  "err": null,
+  "logs": [
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: SettleBet",
+   "Program data: OZHgoD53484DAAAAAAAAADj5PNoYGA/y/AqBCpE6cjAvBORKvrhAW1NsDGA5oCUBQEIPAAAAAAAgTgAAAAAAAAAAIE4AAAAAAACAhB4AAAAAAEBvQAEAAAAAwMYtAAAAAAA=",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 35463 of 400000 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM invoke [1]",
+   "Program log: Instruction: PlaceBet",
+   "Program data: WFiR4n7OIAAEAAAAAAAAADj5PNoYGA/y/AqBCpE6cjAvBORKvrhAW1NsDGA5oCUBQEIPAAAAAAAgTgAAAAAAAICEHgAAAAAAAQAtMQEAAAAA",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM consumed 14857 of 364537 compute units",
+   "Program DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM success"
+  ]
+ }
+]

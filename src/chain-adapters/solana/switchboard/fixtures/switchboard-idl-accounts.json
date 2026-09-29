@@ -1,0 +1,744 @@
+{
+ "_source": "Trimmed from the on-chain IDL of Switchboard On-Demand (devnet program Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2), fetched 2026-09-29. Only the account layouts read off-chain by the operator crank.",
+ "address": "Aio4gaXjXzJNVLtzwtNVmSqGKpANtXhybbkhtAC94ji2",
+ "accounts": [
+  {
+   "name": "OracleAccountData",
+   "discriminator": [
+    128,
+    30,
+    16,
+    241,
+    170,
+    73,
+    55,
+    54
+   ]
+  },
+  {
+   "name": "QueueAccountData",
+   "discriminator": [
+    217,
+    194,
+    55,
+    127,
+    184,
+    83,
+    138,
+    1
+   ]
+  },
+  {
+   "name": "RandomnessAccountData",
+   "discriminator": [
+    10,
+    66,
+    229,
+    135,
+    220,
+    239,
+    217,
+    114
+   ]
+  }
+ ],
+ "types": [
+  {
+   "name": "OracleAccountData",
+   "serialization": "bytemuck",
+   "repr": {
+    "kind": "c"
+   },
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "enclave",
+      "docs": [
+       "Represents the state of the quote verifiers enclave."
+      ],
+      "type": {
+       "defined": {
+        "name": "Quote"
+       }
+      }
+     },
+     {
+      "name": "authority",
+      "docs": [
+       "The authority of the EnclaveAccount which is permitted to make account changes."
+      ],
+      "type": "pubkey"
+     },
+     {
+      "name": "queue",
+      "docs": [
+       "Queue used for attestation to verify a MRENCLAVE measurement."
+      ],
+      "type": "pubkey"
+     },
+     {
+      "name": "created_at",
+      "docs": [
+       "The unix timestamp when the quote was created."
+      ],
+      "type": "i64"
+     },
+     {
+      "name": "last_heartbeat",
+      "docs": [
+       "The last time the quote heartbeated on-chain."
+      ],
+      "type": "i64"
+     },
+     {
+      "name": "secp_authority",
+      "type": {
+       "array": [
+        "u8",
+        64
+       ]
+      }
+     },
+     {
+      "name": "gateway_uri",
+      "docs": [
+       "URI location of the verifier's gateway."
+      ],
+      "type": {
+       "array": [
+        "u8",
+        64
+       ]
+      }
+     },
+     {
+      "name": "permissions",
+      "type": "u64"
+     },
+     {
+      "name": "is_on_queue",
+      "docs": [
+       "Whether the quote is located on the AttestationQueues buffer."
+      ],
+      "type": "u8"
+     },
+     {
+      "name": "_padding1",
+      "type": {
+       "array": [
+        "u8",
+        7
+       ]
+      }
+     },
+     {
+      "name": "lut_slot",
+      "type": "u64"
+     },
+     {
+      "name": "last_reward_epoch",
+      "type": "u64"
+     },
+     {
+      "name": "operator",
+      "type": "pubkey"
+     },
+     {
+      "name": "_ebuf3",
+      "type": {
+       "array": [
+        "u8",
+        16
+       ]
+      }
+     },
+     {
+      "name": "_ebuf2",
+      "type": {
+       "array": [
+        "u8",
+        64
+       ]
+      }
+     },
+     {
+      "name": "_ebuf1",
+      "type": {
+       "array": [
+        "u8",
+        1024
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "QueueAccountData",
+   "docs": [
+    "An Queue represents a round-robin queue of oracle oracles who attest on-chain",
+    "whether a Switchboard Function was executed within an enclave against an expected set of",
+    "enclave measurements.",
+    "",
+    "For an oracle to join the queue, the oracle must first submit their enclave quote on-chain and",
+    "wait for an existing oracle to attest their quote. If the oracle's quote matches an expected",
+    "measurement within the queues mr_enclaves config, it is granted permissions and will start",
+    "being assigned update requests."
+   ],
+   "serialization": "bytemuck",
+   "repr": {
+    "kind": "c"
+   },
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "authority",
+      "docs": [
+       "The address of the authority which is permitted to add/remove allowed enclave measurements."
+      ],
+      "type": "pubkey"
+     },
+     {
+      "name": "mr_enclaves",
+      "docs": [
+       "Allowed enclave measurements."
+      ],
+      "type": {
+       "array": [
+        {
+         "array": [
+          "u8",
+          32
+         ]
+        },
+        32
+       ]
+      }
+     },
+     {
+      "name": "oracle_keys",
+      "docs": [
+       "The addresses of the quote oracles who have a valid",
+       "verification status and have heartbeated on-chain recently."
+      ],
+      "type": {
+       "array": [
+        "pubkey",
+        78
+       ]
+      }
+     },
+     {
+      "name": "reserved1",
+      "type": {
+       "array": [
+        "u8",
+        40
+       ]
+      }
+     },
+     {
+      "name": "secp_oracle_signing_keys",
+      "type": {
+       "array": [
+        {
+         "array": [
+          "u8",
+          20
+         ]
+        },
+        30
+       ]
+      }
+     },
+     {
+      "name": "ed25519_oracle_signing_keys",
+      "type": {
+       "array": [
+        "pubkey",
+        30
+       ]
+      }
+     },
+     {
+      "name": "max_quote_verification_age",
+      "docs": [
+       "The maximum allowable time until a EnclaveAccount needs to be re-verified on-chain."
+      ],
+      "type": "i64"
+     },
+     {
+      "name": "last_heartbeat",
+      "docs": [
+       "The unix timestamp when the last quote oracle heartbeated on-chain."
+      ],
+      "type": "i64"
+     },
+     {
+      "name": "node_timeout",
+      "type": "i64"
+     },
+     {
+      "name": "oracle_min_stake",
+      "docs": [
+       "The minimum number of lamports a quote oracle needs to lock-up in order to heartbeat and verify other quotes."
+      ],
+      "type": "u64"
+     },
+     {
+      "name": "allow_authority_override_after",
+      "type": "i64"
+     },
+     {
+      "name": "mr_enclaves_len",
+      "docs": [
+       "The number of allowed enclave measurements."
+      ],
+      "type": "u32"
+     },
+     {
+      "name": "oracle_keys_len",
+      "docs": [
+       "The length of valid quote oracles for the given attestation queue."
+      ],
+      "type": "u32"
+     },
+     {
+      "name": "reward",
+      "docs": [
+       "The reward paid to quote oracles for attesting on-chain."
+      ],
+      "type": "u32"
+     },
+     {
+      "name": "curr_idx",
+      "docs": [
+       "Incrementer used to track the current quote oracle permitted to run any available functions."
+      ],
+      "type": "u32"
+     },
+     {
+      "name": "gc_idx",
+      "docs": [
+       "Incrementer used to garbage collect and remove stale quote oracles."
+      ],
+      "type": "u32"
+     },
+     {
+      "name": "require_authority_heartbeat_permission",
+      "type": "u8"
+     },
+     {
+      "name": "require_authority_verify_permission",
+      "type": "u8"
+     },
+     {
+      "name": "require_usage_permissions",
+      "type": "u8"
+     },
+     {
+      "name": "signer_bump",
+      "type": "u8"
+     },
+     {
+      "name": "mint",
+      "type": "pubkey"
+     },
+     {
+      "name": "lut_slot",
+      "type": "u64"
+     },
+     {
+      "name": "allow_subsidies",
+      "type": "u8"
+     },
+     {
+      "name": "_ebuf6",
+      "type": {
+       "array": [
+        "u8",
+        15
+       ]
+      }
+     },
+     {
+      "name": "ncn",
+      "type": "pubkey"
+     },
+     {
+      "name": "_resrved",
+      "type": "u64"
+     },
+     {
+      "name": "vaults",
+      "type": {
+       "array": [
+        {
+         "defined": {
+          "name": "VaultInfo"
+         }
+        },
+        4
+       ]
+      }
+     },
+     {
+      "name": "last_reward_epoch",
+      "type": "u64"
+     },
+     {
+      "name": "oracle_fee_proportion_bps",
+      "docs": [
+       "The proportion of subsidy rewards that go to oracle operators (in basis points, 5000 = 50%)"
+      ],
+      "type": "u32"
+     },
+     {
+      "name": "_ebuf4",
+      "type": {
+       "array": [
+        "u8",
+        32
+       ]
+      }
+     },
+     {
+      "name": "_ebuf2",
+      "type": {
+       "array": [
+        "u8",
+        256
+       ]
+      }
+     },
+     {
+      "name": "_ebuf1",
+      "type": {
+       "array": [
+        "u8",
+        500
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "Quote",
+   "serialization": "bytemuck",
+   "repr": {
+    "kind": "c"
+   },
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "enclave_signer",
+      "docs": [
+       "The address of the signer generated within an enclave."
+      ],
+      "type": "pubkey"
+     },
+     {
+      "name": "mr_enclave",
+      "docs": [
+       "The quotes MRENCLAVE measurement dictating the contents of the secure enclave."
+      ],
+      "type": {
+       "array": [
+        "u8",
+        32
+       ]
+      }
+     },
+     {
+      "name": "verification_status",
+      "docs": [
+       "The VerificationStatus of the quote."
+      ],
+      "type": "u8"
+     },
+     {
+      "name": "padding1",
+      "type": {
+       "array": [
+        "u8",
+        7
+       ]
+      }
+     },
+     {
+      "name": "verification_timestamp",
+      "docs": [
+       "The unix timestamp when the quote was last verified."
+      ],
+      "type": "i64"
+     },
+     {
+      "name": "valid_until",
+      "docs": [
+       "The unix timestamp when the quotes verification status expires."
+      ],
+      "type": "i64"
+     },
+     {
+      "name": "quote_registry",
+      "docs": [
+       "The off-chain registry where the verifiers quote can be located."
+      ],
+      "type": {
+       "array": [
+        "u8",
+        32
+       ]
+      }
+     },
+     {
+      "name": "registry_key",
+      "docs": [
+       "Key to lookup the buffer data on IPFS or an alternative decentralized storage solution."
+      ],
+      "type": {
+       "array": [
+        "u8",
+        64
+       ]
+      }
+     },
+     {
+      "name": "secp256k1_signer",
+      "docs": [
+       "The secp256k1 public key of the enclave signer. Derived from the enclave_signer."
+      ],
+      "type": {
+       "array": [
+        "u8",
+        64
+       ]
+      }
+     },
+     {
+      "name": "last_ed25519_signer",
+      "type": "pubkey"
+     },
+     {
+      "name": "last_secp256k1_signer",
+      "type": {
+       "array": [
+        "u8",
+        64
+       ]
+      }
+     },
+     {
+      "name": "last_rotate_slot",
+      "type": "u64"
+     },
+     {
+      "name": "guardian_approvers",
+      "type": {
+       "array": [
+        "pubkey",
+        64
+       ]
+      }
+     },
+     {
+      "name": "guardian_approvers_len",
+      "type": "u8"
+     },
+     {
+      "name": "padding2",
+      "type": {
+       "array": [
+        "u8",
+        7
+       ]
+      }
+     },
+     {
+      "name": "staging_ed25519_signer",
+      "type": "pubkey"
+     },
+     {
+      "name": "staging_secp256k1_signer",
+      "type": {
+       "array": [
+        "u8",
+        64
+       ]
+      }
+     },
+     {
+      "name": "eth_signer",
+      "type": {
+       "array": [
+        "u8",
+        20
+       ]
+      }
+     },
+     {
+      "name": "_ebuf4",
+      "type": {
+       "array": [
+        "u8",
+        4
+       ]
+      }
+     },
+     {
+      "name": "last_sign_ts",
+      "type": "i64"
+     },
+     {
+      "name": "_ebuf3",
+      "docs": [
+       "Reserved."
+      ],
+      "type": {
+       "array": [
+        "u8",
+        128
+       ]
+      }
+     },
+     {
+      "name": "_ebuf2",
+      "type": {
+       "array": [
+        "u8",
+        256
+       ]
+      }
+     },
+     {
+      "name": "_ebuf1",
+      "type": {
+       "array": [
+        "u8",
+        512
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "RandomnessAccountData",
+   "serialization": "bytemuck",
+   "repr": {
+    "kind": "c"
+   },
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "authority",
+      "type": "pubkey"
+     },
+     {
+      "name": "queue",
+      "type": "pubkey"
+     },
+     {
+      "name": "seed_slothash",
+      "type": {
+       "array": [
+        "u8",
+        32
+       ]
+      }
+     },
+     {
+      "name": "seed_slot",
+      "type": "u64"
+     },
+     {
+      "name": "oracle",
+      "type": "pubkey"
+     },
+     {
+      "name": "reveal_slot",
+      "type": "u64"
+     },
+     {
+      "name": "value",
+      "type": {
+       "array": [
+        "u8",
+        32
+       ]
+      }
+     },
+     {
+      "name": "lut_slot",
+      "type": "u64"
+     },
+     {
+      "name": "_ebuf3",
+      "type": {
+       "array": [
+        "u8",
+        24
+       ]
+      }
+     },
+     {
+      "name": "_ebuf2",
+      "type": {
+       "array": [
+        "u8",
+        64
+       ]
+      }
+     },
+     {
+      "name": "_ebuf1",
+      "type": {
+       "array": [
+        "u8",
+        128
+       ]
+      }
+     },
+     {
+      "name": "active_secp256k1_signer",
+      "type": {
+       "array": [
+        "u8",
+        64
+       ]
+      }
+     },
+     {
+      "name": "active_secp256k1_expiration",
+      "type": "i64"
+     }
+    ]
+   }
+  },
+  {
+   "name": "VaultInfo",
+   "serialization": "bytemuck",
+   "repr": {
+    "kind": "c"
+   },
+   "type": {
+    "kind": "struct",
+    "fields": [
+     {
+      "name": "vault_key",
+      "type": "pubkey"
+     },
+     {
+      "name": "last_reward_epoch",
+      "type": "u64"
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -6,7 +6,7 @@ use crate::{
     error::CrashError,
     events::{BankDeposited, BankWithdrawn, RandomnessAccountSet},
     program::Crash,
-    state::{HouseConfig, HouseVault, Limits, Timeouts},
+    state::{HouseConfig, HouseVault, Limits, PlayerPolicy, Timeouts},
     switchboard,
     vault::free_lamports,
 };
@@ -16,6 +16,7 @@ fn validate_config(
     limits: &Limits,
     timeouts: &Timeouts,
     max_bets_per_round: u32,
+    player_policy: &PlayerPolicy,
 ) -> Result<()> {
     let valid = *operator != Pubkey::default()
         && limits.to_rules().is_valid()
@@ -24,7 +25,8 @@ fn validate_config(
         && timeouts.betting_slots > 0
         && timeouts.entropy_timeout_slots > 0
         && timeouts.reveal_grace_slots > 0
-        && max_bets_per_round > 0;
+        && max_bets_per_round > 0
+        && player_policy.max_session_slots > 0;
     require!(valid, CrashError::InvalidConfig);
     Ok(())
 }
@@ -51,8 +53,15 @@ pub fn handle_initialize_house(
     limits: Limits,
     timeouts: Timeouts,
     max_bets_per_round: u32,
+    player_policy: PlayerPolicy,
 ) -> Result<()> {
-    validate_config(&operator, &limits, &timeouts, max_bets_per_round)?;
+    validate_config(
+        &operator,
+        &limits,
+        &timeouts,
+        max_bets_per_round,
+        &player_policy,
+    )?;
     ctx.accounts.config.set_inner(HouseConfig {
         admin: ctx.accounts.admin.key(),
         operator,
@@ -60,6 +69,7 @@ pub fn handle_initialize_house(
         limits,
         max_bets_per_round,
         timeouts,
+        player_policy,
         paused: false,
         next_round_id: 0,
         current_round: None,
@@ -90,13 +100,21 @@ pub fn handle_update_config(
     timeouts: Timeouts,
     max_bets_per_round: u32,
     paused: bool,
+    player_policy: PlayerPolicy,
 ) -> Result<()> {
-    validate_config(&operator, &limits, &timeouts, max_bets_per_round)?;
+    validate_config(
+        &operator,
+        &limits,
+        &timeouts,
+        max_bets_per_round,
+        &player_policy,
+    )?;
     let config = &mut ctx.accounts.config;
     config.operator = operator;
     config.limits = limits;
     config.timeouts = timeouts;
     config.max_bets_per_round = max_bets_per_round;
+    config.player_policy = player_policy;
     config.paused = paused;
     Ok(())
 }

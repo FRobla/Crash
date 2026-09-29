@@ -2,7 +2,7 @@
 
 import { useConnection } from "@solana/wallet-adapter-react";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { classifyGenesisHash, RPC_HEALTH_CHECK_INTERVAL_MS, type RpcHealth } from "./rpc-health";
+import { classifyGenesisHash, classifyRpcError, RPC_HEALTH_CHECK_INTERVAL_MS, type RpcHealth } from "./rpc-health";
 
 const RpcHealthContext = createContext<RpcHealth>("checking");
 
@@ -18,8 +18,8 @@ export function RpcHealthProvider({ children }: { children: ReactNode }) {
       try {
         const genesisHash = await connection.getGenesisHash();
         if (!cancelled) setHealth(classifyGenesisHash(genesisHash));
-      } catch {
-        if (!cancelled) setHealth("unreachable");
+      } catch (error) {
+        if (!cancelled) setHealth(classifyRpcError(error));
       }
     }
 

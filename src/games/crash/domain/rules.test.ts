@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assertValidCrashPointParams } from "./crash-point";
 import { createMultiplierCurve } from "./multiplier-curve";
-import { CRASH_RULES_V1 } from "./rules";
+import { CRASH_RULES_V1, rulesForVersion } from "./rules";
 
 describe("CRASH_RULES_V1", () => {
   it("holds the parameters approved for devnet", () => {
@@ -20,5 +20,11 @@ describe("CRASH_RULES_V1", () => {
 
   it("is immutable", () => {
     expect(Object.isFrozen(CRASH_RULES_V1)).toBe(true);
+  });
+
+  it("is looked up by version, and unknown versions are not guessed", () => {
+    expect(rulesForVersion(1)).toBe(CRASH_RULES_V1);
+    expect(rulesForVersion(0)).toBeNull();
+    expect(rulesForVersion(2)).toBeNull();
   });
 });

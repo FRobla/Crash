@@ -1,13 +1,71 @@
 # Checklist
 
+## Iteración 8 — Versión funcional mínima (crank, web, History y Fairness)
+
+Iniciada el 2026-09-29. Revisión previa: JS (151 pruebas, lint, typecheck) y Rust (38 pruebas, fmt) en verde; `pnpm audit` con las 2 moderadas conocidas. Decisiones del usuario: crank en Node dentro del repo, clave de sesión en `localStorage`, codec propio sin el cliente TS de Anchor, alcance Crash + Fairness + History.
+
+### 0. Cabos sueltos
+- [x] Estados de las specs corregidos: v1.1 → histórico, v2 → vigente (`crash-program.md`, `crash-program-v2.md`, `CLAUDE.md`)
+- [ ] Commit de la iteración 7 (lo gestiona el usuario)
+- [ ] Aplazados, sin bloquear esta iteración: spec de progresión (`PROGRESSION_V1`) y ADR del chat (iteración 7, §3)
+
+### 1. Spec (spec-first)
+- [x] `docs/specs/crash-client-v1.md` redactada: codec, crank, web, History, Fairness, invariantes, amenazas
+- [x] Aprobación de la spec y de las decisiones de su §11 (2026-09-29)
+
+### 2. Implementación
+- [x] IDL versionado y codec TS con pruebas contra el IDL y cuentas reales de devnet
+- [x] `games/crash/fairness` con rondas reales (reproduce las 9 rondas reveladas de v2)
+- [x] Adaptador off-chain de Switchboard (oráculo, gateway) con fixtures reales
+- [x] Crank en `services/operator/`: máquina de estados pura, custodia de semillas, recuperación
+- [x] Web: ronda en vivo, alta/compra/sesión, apuesta, cash-out, salida
+- [x] Web: History y Fairness
+
+### 3. Verificación y seguridad
+- [x] `corepack pnpm test` (220), `lint`, `typecheck`, `build`, `audit` (2 moderadas conocidas); Rust sin cambios (38 en verde al inicio)
+- [x] Revisión de seguridad (§10 de la spec): semillas fuera del repo y nunca en logs, claves solo por ruta fuera del repo, límites de dependencias, firmantes por flujo, RPC pública en el gateway, sin secretos en fixtures
+- [x] End-to-end en devnet: crank en las rondas 11–41 (con reinicio a mitad de ronda) y jugador automatizado con los mismos builders que la web: 7 apuestas, 0 discrepancias
+- [ ] Prueba manual de la web con una wallet de navegador real en devnet (usuario)
+- [x] Robustez frente a los 429 de la RPC pública: confirmación por sondeo (web y crank), rechazos no capturados registrados en el crank, History con peticiones secuenciales y reintentos
+- [x] Comprobación de aleatoriedad: ninguna semilla ni VRF repetidos en las rondas 0–39 (los crash points iguales de 15/16 y 30/31 son coincidencia)
+- [x] Jugador E2E reanudable: claves desechables guardadas hasta que se confirma la devolución (antes se perdieron ≈ 0.093 SOL de devnet)
+- [x] Coste de alta en la UI calculado con el rent real de la RPC
+
+### 4. Documentación
+- [x] `CLAUDE.md` (estructura, comandos del crank, límites), `changelog.md`, spec §13
+
+### 5. Pendiente (decisión del usuario)
+- [ ] ¿Recuperar el rent de cada `Round` (≈ 0.0018 SOL) con una instrucción `close_round`? Exige un cambio del programa (spec v2.1)
+- [ ] RPC propia para la web y el crank (la pública limita la tasa)
+
+### 6. Estado al cerrar la sesión (2026-09-29)
+- Crank parado. La ronda 41 quedó abierta con su semilla guardada en `CRASH_OPERATOR_STATE_DIR`: el próximo `pnpm operator` la retoma o la anula sin pérdidas
+- Saldo del operador `3R48…`: 2.21 SOL; bank de la casa: 0.306 SOL
+- Iteraciones 7 y 8 sin commitear (lo gestiona el usuario)
+
+---
+
 ## Iteración 7 — Cuentas de jugador, monedas y sesiones (ADR 0003)
 
 Iniciada el 2026-09-28. Decisiones del usuario: opción A (saldo on-chain + clave de sesión), nombre de usuario on-chain, el nivel dará ventajas en el futuro, sin comisión de compra/venta, chat con base de datos (ADR aparte).
 
 ### 1. Decisión (spec-first)
 - [x] ADR 0003 redactado (propuesto)
-- [ ] Aceptación del usuario y respuesta a las preguntas abiertas del ADR
-- [ ] Spec del programa v2: `Player`, `Username`, sesiones, apuesta embebida, invariantes, validación de cuentas y firmantes
+- [x] Aceptación del usuario y respuesta a las preguntas abiertas del ADR (2026-09-29)
+- [x] Spec del programa v2 redactada (`docs/specs/crash-program-v2.md`): `Player`, `UsernameRecord`, sesiones, apuesta embebida, invariantes, validación de cuentas y firmantes, migración
+- [x] Aprobación de la spec v2 (decisiones de su §14), 2026-09-29
+
+### 2. Implementación
+- [x] Program id nuevo para v2 (keypair de v1.1 guardado fuera del repo)
+- [x] Cuentas `Player`, `UsernameRecord` y `PlayerPolicy`; se eliminan `Bet` y `close_bet`
+- [x] Instrucciones de jugador y sesión; `place_bet`, `cash_out` y `settle_bet` sobre el saldo
+- [x] Pruebas LiteSVM (19) con invariantes tras cada transacción; `cargo test`, `clippy` y `fmt`
+- [x] Revisión de seguridad: firmantes por instrucción (§4 y §8), destinos de fondos, pausa, reentrada (sin CPIs nuevas salvo transferencias del System Program)
+- [x] Documentación: spec v2 §15, `CLAUDE.md`, `changelog.md`
+
+### 3. Pendiente
+- [x] Despliegue en devnet según la spec v2 §13 (bank de v1.1 retirado; v2 en `DNmfJ…`, binario verificado) y prueba end-to-end con el Switchboard real (9 rondas reveladas, 19 liquidaciones sin discrepancias)
+- [x] Timeouts ampliados en devnet (2026-09-29): `betting_slots` 25 → 50 y `entropy_timeout_slots` 150 → 300, con `update_config`
 - [ ] Spec de progresión (`PROGRESSION_V1`) con vectores
 - [ ] ADR del backend del chat (base de datos, hosting, WebSockets)
 
@@ -40,7 +98,7 @@ Iniciada el 2026-09-28. El usuario elige `3R48JPhp8zkRokLdGJx8rFDT53CiKz92BYJErk
 - [x] `changelog.md` — entrada de la iteración 6
 
 ### 5. Pendiente (decisión del usuario)
-- [ ] ¿Ampliar `entropy_timeout_slots` (hoy 150) tras las 2 anulaciones por caídas del gateway? Se aplica con `update_config`, sin redesplegar
+- [x] ¿Ampliar `entropy_timeout_slots`? Sí: 300 desde el 2026-09-29 (iteración 7)
 
 ---
 

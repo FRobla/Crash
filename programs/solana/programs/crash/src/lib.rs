@@ -1,4 +1,4 @@
-//! Crash settlement authority (docs/specs/crash-program.md). Rules come from the pure
+//! Crash settlement authority (docs/specs/crash-program-v2.md). Rules come from the pure
 //! `crash-rules` crate so the program and the reference vectors cannot drift apart.
 
 pub mod constants;
@@ -16,7 +16,7 @@ pub use constants::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("384CfvvBXN52P4vga71WS7VUT9wv1HtB7YTR3UYLtZK4");
+declare_id!("DNmfJzhj6Uaa1Zbd2HhUT9mES27jhzXkMThDm3ikRarM");
 
 #[program]
 pub mod crash {
@@ -28,8 +28,16 @@ pub mod crash {
         limits: Limits,
         timeouts: Timeouts,
         max_bets_per_round: u32,
+        player_policy: PlayerPolicy,
     ) -> Result<()> {
-        house::handle_initialize_house(ctx, operator, limits, timeouts, max_bets_per_round)
+        house::handle_initialize_house(
+            ctx,
+            operator,
+            limits,
+            timeouts,
+            max_bets_per_round,
+            player_policy,
+        )
     }
 
     pub fn update_config(
@@ -39,8 +47,17 @@ pub mod crash {
         timeouts: Timeouts,
         max_bets_per_round: u32,
         paused: bool,
+        player_policy: PlayerPolicy,
     ) -> Result<()> {
-        house::handle_update_config(ctx, operator, limits, timeouts, max_bets_per_round, paused)
+        house::handle_update_config(
+            ctx,
+            operator,
+            limits,
+            timeouts,
+            max_bets_per_round,
+            paused,
+            player_policy,
+        )
     }
 
     pub fn deposit_bank(ctx: Context<DepositBank>, amount: u64) -> Result<()> {
@@ -104,7 +121,40 @@ pub mod crash {
         round::handle_forfeit_round(ctx)
     }
 
-    pub fn close_bet(ctx: Context<CloseBet>) -> Result<()> {
-        bet::handle_close_bet(ctx)
+    pub fn register_player(ctx: Context<RegisterPlayer>, username: String) -> Result<()> {
+        player::handle_register_player(ctx, username)
+    }
+
+    pub fn buy_coins(ctx: Context<BuyCoins>, amount: u64) -> Result<()> {
+        player::handle_buy_coins(ctx, amount)
+    }
+
+    pub fn sell_coins(ctx: Context<SellCoins>, amount: u64) -> Result<()> {
+        player::handle_sell_coins(ctx, amount)
+    }
+
+    pub fn create_session(
+        ctx: Context<CreateSession>,
+        expires_slot: u64,
+        spend_cap: u64,
+        fee_budget: u64,
+    ) -> Result<()> {
+        player::handle_create_session(ctx, expires_slot, spend_cap, fee_budget)
+    }
+
+    pub fn revoke_session(ctx: Context<RevokeSession>) -> Result<()> {
+        player::handle_revoke_session(ctx)
+    }
+
+    pub fn change_username(ctx: Context<ChangeUsername>, username: String) -> Result<()> {
+        player::handle_change_username(ctx, username)
+    }
+
+    pub fn reset_username(ctx: Context<ResetUsername>) -> Result<()> {
+        player::handle_reset_username(ctx)
+    }
+
+    pub fn close_player(ctx: Context<ClosePlayer>) -> Result<()> {
+        player::handle_close_player(ctx)
     }
 }

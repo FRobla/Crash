@@ -5,6 +5,7 @@
 - Decisiones: [ADR 0001](../adr/0001-settlement-authority.md) (aceptado: programa Anchor, tick = slot) y [ADR 0002](../adr/0002-randomness-source.md) (aceptado: esquema C con Switchboard On-Demand y authority PDA; datos en el [spike](../spikes/vrf-devnet.md)).
 - Reglas: [`crash-round-rules.md`](crash-round-rules.md) v1. Vectores de referencia: [`vectors/crash-rules-v1.json`](vectors/crash-rules-v1.json).
 - Red: **solo devnet**. Pasar a mainnet exige revisión legal, de riesgo y de seguridad, además de una auditoría externa.
+- **Sustituida por [v2](crash-program-v2.md)** (ADR 0003: cuentas de jugador, monedas y sesiones), implementada y desplegada en devnet el 2026-09-29. Esta v1.1 queda como histórico del programa retirado `384Cf…`; v2 solo describe lo que cambia, así que lo que v2 no menciona sigue definido aquí.
 
 ## 1. Alcance
 

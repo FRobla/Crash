@@ -29,10 +29,13 @@ pub struct RoundOpened {
 #[event]
 pub struct BetPlaced {
     pub round_id: u64,
+    /// Wallet that owns the `Player` account.
     pub player: Pubkey,
     pub stake: u64,
     pub auto_cash_out: u64,
     pub exposure: u64,
+    pub by_session: bool,
+    pub balance: u64,
 }
 
 #[event]
@@ -68,13 +71,19 @@ pub struct RoundRevealed {
     pub crash_tick: u64,
 }
 
+/// Self-contained record of a bet, so it stays auditable without per-bet accounts (spec v2 §10).
 #[event]
 pub struct BetSettled {
     pub round_id: u64,
     pub player: Pubkey,
+    pub stake: u64,
+    pub auto_cash_out: u64,
+    pub cash_out_tick: Option<u64>,
     pub outcome: BetOutcome,
     pub multiplier: u64,
     pub payout: u64,
+    pub balance: u64,
+    pub total_wagered: u64,
 }
 
 #[event]
@@ -85,4 +94,56 @@ pub struct RoundVoided {
 #[event]
 pub struct RoundForfeited {
     pub round_id: u64,
+}
+
+#[event]
+pub struct PlayerRegistered {
+    pub owner: Pubkey,
+    pub username: String,
+}
+
+#[event]
+pub struct CoinsBought {
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub balance: u64,
+}
+
+#[event]
+pub struct CoinsSold {
+    pub owner: Pubkey,
+    pub amount: u64,
+    pub balance: u64,
+}
+
+#[event]
+pub struct SessionCreated {
+    pub owner: Pubkey,
+    pub key: Pubkey,
+    pub expires_slot: u64,
+    pub spend_cap: u64,
+}
+
+#[event]
+pub struct SessionRevoked {
+    pub owner: Pubkey,
+    pub key: Pubkey,
+}
+
+#[event]
+pub struct UsernameChanged {
+    pub owner: Pubkey,
+    pub old: String,
+    pub new: String,
+}
+
+#[event]
+pub struct UsernameReset {
+    pub owner: Pubkey,
+    pub old: String,
+}
+
+#[event]
+pub struct PlayerClosed {
+    pub owner: Pubkey,
 }
