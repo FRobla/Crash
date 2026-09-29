@@ -3,7 +3,7 @@
 import { useId, useState, type PointerEvent } from "react";
 import { rulesForVersion } from "../domain/rules";
 import type { Multiplier } from "../domain/units";
-import type { LiveRound, MyBet } from "./crash-game";
+import type { CrashGamePort, LiveRound, MyBet } from "./crash-game";
 import {
   axisMultiplierLabel,
   chartDomains,
@@ -14,16 +14,25 @@ import {
   type CurvePoint,
 } from "./chart-geometry";
 import { formatMultiplier } from "./multiplier-text";
-import { APPROX_SECONDS_PER_TICK, curveForRules, multiplierAt, type RoundDisplay } from "./round-view";
+import { curveForRules, multiplierAt, type RoundDisplay, type ShownRound } from "./round-view";
 import { useElementSize } from "./use-element-size";
+import { useFrameValue, useReducedMotion } from "./use-frame-value";
 
 const PAD = { left: 46, right: 18, top: 18, bottom: 26 };
 
+/**
+ * The curve and the headline trail the slot projection by one tick: a jitter buffer, so a crash
+ * verified from the live feed usually arrives before the curve passes it, and the curve climbs
+ * exactly to the crash point instead of overshooting (spec crash-client-v1 §5.2).
+ */
+export const PRESENTATION_LAG_TICKS = 1;
+
 interface CrashChartProps {
-  round: LiveRound | null;
+  game: Pick<CrashGamePort, "projectedTick" | "msPerTick">;
+  round: ShownRound | null;
   display: RoundDisplay;
-  tick: bigint | null;
-  fraction: number;
+  /** The held crash is fading out towards the next round's countdown. */
+  fading: boolean;
   myBet: MyBet | null;
   /** Recognized multiplier of the player's recorded cash-out in this round, if any. */
   cashedOutAt: Multiplier | null;
@@ -34,33 +43,42 @@ interface Series {
   tone: "running" | "crashed";
 }
 
-function seriesFor(round: LiveRound | null, display: RoundDisplay, tick: bigint | null, fraction: number): Series | null {
+function seriesFor(round: LiveRound | null, display: RoundDisplay, relativeTick: number | null): Series | null {
   if (!round || round.startTick === null) return null;
   const rules = rulesForVersion(round.rulesVersion);
   if (!rules) return null;
   const curve = curveForRules(rules);
-  if (display.kind === "running" && tick !== null) {
-    const relative = Number(tick - round.startTick);
-    if (relative < 0) return { samples: curveSamples(curve, 0), tone: "running" };
-    return { samples: curveSamples(curve, relative, fraction), tone: "running" };
+  if (display.kind === "running" && relativeTick !== null) {
+    return { samples: curveSamples(curve, Math.max(0, relativeTick)), tone: "running" };
   }
   if (display.kind === "crashed") {
     const last = lastTickAtOrBelow(curve, display.crashPoint);
-    return { samples: curveSamples(curve, last + 1, 0, display.crashPoint), tone: "crashed" };
+    return { samples: curveSamples(curve, last + 1, display.crashPoint), tone: "crashed" };
   }
   return null;
 }
 
 /**
  * Live multiplier chart: the rules' curve drawn up to the projected tick while a round runs, and
- * up to the revealed crash point once it ends. Presentation of the port's data only.
+ * up to the crash point once it ends. Presentation of the port's data only; it subscribes to
+ * animation frames itself, so only the chart re-renders at frame rate.
  */
-export function CrashChart({ round, display, tick, fraction, myBet, cashedOutAt }: CrashChartProps) {
+export function CrashChart({ game, round, display, fading, myBet, cashedOutAt }: CrashChartProps) {
   const [containerRef, measured] = useElementSize<HTMLDivElement>();
   const gradientId = useId();
   const [hoverTick, setHoverTick] = useState<number | null>(null);
+  const reduced = useReducedMotion();
+  const startTick = round?.startTick ?? null;
+  const running = display.kind === "running" && startTick !== null;
+  const relativeTick = useFrameValue(() => {
+    const tick = game.projectedTick();
+    if (tick === null || startTick === null) return null;
+    const relative = tick - Number(startTick) - PRESENTATION_LAG_TICKS;
+    return reduced ? Math.floor(relative) : relative;
+  }, running);
+  const secondsPerTick = game.msPerTick() / 1000;
 
-  const series = seriesFor(round, display, tick, fraction);
+  const series = seriesFor(round, display, running ? relativeTick : null);
   const samples = series?.samples ?? [];
   const lastSample = samples.at(-1);
   const betInRound = myBet !== null && round !== null && myBet.roundId === round.roundId;
@@ -75,7 +93,7 @@ export function CrashChart({ round, display, tick, fraction, myBet, cashedOutAt 
   const y = (value: number) => PAD.top + plotHeight - ((value - domains.y.min) / (domains.y.max - domains.y.min)) * plotHeight;
   const baseline = y(1);
 
-  const seconds = { min: 0, max: domains.x.max * APPROX_SECONDS_PER_TICK };
+  const seconds = { min: 0, max: domains.x.max * secondsPerTick };
   const xTicks = niceTicks(seconds, Math.max(2, Math.floor(plotWidth / 90)));
   const yTicks = niceTicks(domains.y, Math.max(2, Math.floor(plotHeight / 55)));
 
@@ -117,7 +135,7 @@ export function CrashChart({ round, display, tick, fraction, myBet, cashedOutAt 
               <line key={`y-${value}`} x1={PAD.left} x2={width - PAD.right} y1={y(value)} y2={y(value)} stroke="currentColor" />
             ))}
             {xTicks.map((value) => {
-              const px = x(value / APPROX_SECONDS_PER_TICK);
+              const px = x(value / secondsPerTick);
               return <line key={`x-${value}`} x1={px} x2={px} y1={PAD.top} y2={baseline} stroke="currentColor" />;
             })}
           </g>
@@ -129,7 +147,7 @@ export function CrashChart({ round, display, tick, fraction, myBet, cashedOutAt 
               </text>
             ))}
             {xTicks.map((value) => (
-              <text key={`xl-${value}`} x={x(value / APPROX_SECONDS_PER_TICK)} y={height - 8} textAnchor="middle">
+              <text key={`xl-${value}`} x={x(value / secondsPerTick)} y={height - 8} textAnchor="middle">
                 {value === 0 ? "0" : `${value}s`}
               </text>
             ))}
@@ -154,7 +172,7 @@ export function CrashChart({ round, display, tick, fraction, myBet, cashedOutAt 
           )}
   
           {series && lastSample && (
-            <g className={`${toneClass} transition-colors duration-300`}>
+            <g className={`${toneClass} transition-[color,opacity] duration-500 ${fading ? "opacity-0" : "opacity-100"}`}>
               <path d={area} fill={`url(#${gradientId})`} />
               <path d={line} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
               <circle cx={x(lastSample.tick)} cy={y(lastSample.value)} r="5" className="stroke-surface" fill="currentColor" strokeWidth="2" />
@@ -190,7 +208,7 @@ export function CrashChart({ round, display, tick, fraction, myBet, cashedOutAt 
             top: Math.max(PAD.top, y(hover.value) - 36),
           }}
         >
-          <span className="text-muted">~{(hover.tick * APPROX_SECONDS_PER_TICK).toFixed(1)}s · </span>
+          <span className="text-muted">~{(hover.tick * secondsPerTick).toFixed(1)}s · </span>
           {formatMultiplier(hover.recognized)}
         </div>
       )}

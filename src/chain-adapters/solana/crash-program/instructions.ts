@@ -1,5 +1,6 @@
 import { Buffer } from "buffer";
 import { PublicKey, SystemProgram, TransactionInstruction } from "@solana/web3.js";
+import type { Limits, PlayerPolicy, Timeouts } from "./accounts";
 import { BorshWriter, encodeType, snakeToCamel } from "./borsh";
 import { CRASH_IDL_TYPES, idlInstruction } from "./idl";
 import {
@@ -136,6 +137,22 @@ export function settleBetIx(programId: PublicKey, owner: PublicKey, roundId: big
     vault: houseVaultAddress(programId),
     player: playerAddress(programId, owner),
   });
+}
+
+// ---- Admin (spec v1.1 §4) ----
+
+export interface UpdateConfigArgs {
+  operator: PublicKey;
+  limits: Limits;
+  timeouts: Timeouts;
+  maxBetsPerRound: number;
+  paused: boolean;
+  playerPolicy: PlayerPolicy;
+}
+
+/** Replaces every configurable field at once: callers copy the current values they keep. */
+export function updateConfigIx(programId: PublicKey, admin: PublicKey, args: UpdateConfigArgs) {
+  return buildInstruction(programId, "update_config", { admin, config: houseConfigAddress(programId) }, { ...args });
 }
 
 // ---- Rounds (spec v1.1 §4, driven by the operator crank) ----

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCoins, parseCoins } from "./coins";
+import { formatCoins, formatNative, parseCoins } from "./coins";
 
 describe("parseCoins", () => {
   it("converts coin text to base units exactly", () => {
@@ -36,5 +36,14 @@ describe("formatCoins", () => {
     for (const value of [0n, 1n, 999_999n, 1_000_000n, 123_456_789n]) {
       expect(parseCoins(formatCoins(value))).toEqual({ ok: true, baseUnits: value });
     }
+  });
+});
+
+describe("formatNative", () => {
+  it("shows the wallet's native amount truncated to 4 decimals", () => {
+    expect(formatNative(0n)).toBe("0.0000");
+    expect(formatNative(1_234_567_891n)).toBe("1.2345");
+    expect(formatNative(999_999n)).toBe("0.0009");
+    expect(formatNative(5_000_000_000n)).toBe("5.0000");
   });
 });

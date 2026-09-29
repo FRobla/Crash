@@ -5,6 +5,7 @@ import {
   axisMultiplierLabel,
   chartDomains,
   curveSamples,
+  interpolatedMultiplier,
   lastTickAtOrBelow,
   logRatio,
   niceStep,
@@ -29,14 +30,29 @@ describe("chart geometry", () => {
     expect(grown.y.max).toBeGreaterThan(10);
   });
 
-  it("samples the curve with an interpolated tip that stays below the next tick", () => {
-    const samples = curveSamples(curve, 10, 0.5);
+  it("samples the curve up to a continuous tick, with an interpolated tip below the next point", () => {
+    const samples = curveSamples(curve, 10.5);
     expect(samples).toHaveLength(12);
     expect(samples[0]).toEqual({ tick: 0, value: 1 });
     const tip = samples[11];
     expect(tip.tick).toBe(10.5);
     expect(tip.value).toBeGreaterThan(samples[10].value);
     expect(tip.value).toBeLessThan(Number(curve.points[11]) / 10_000);
+    expect(curveSamples(curve, -3)).toEqual([{ tick: 0, value: 1 }]);
+  });
+
+  it("interpolates exponentially, continuously and monotonically between points", () => {
+    const at = (tick: number) => interpolatedMultiplier(curve, tick);
+    expect(at(10)).toBe(Number(curve.points[10]) / 10_000);
+    expect(at(10.999999)).toBeCloseTo(Number(curve.points[11]) / 10_000, 4);
+    // Exponential: the midpoint is the geometric mean of its neighbours.
+    expect(at(10.5)).toBeCloseTo(Math.sqrt(at(10) * at(11)), 10);
+    let previous = at(0);
+    for (let tick = 0.05; tick < 60; tick += 0.05) {
+      expect(at(tick)).toBeGreaterThanOrEqual(previous);
+      previous = at(tick);
+    }
+    expect(at(-1)).toBe(1);
   });
 
   it("ends a revealed curve exactly at the crash point", () => {
@@ -44,7 +60,7 @@ describe("chart geometry", () => {
     const last = lastTickAtOrBelow(curve, crashPoint);
     expect(curve.points[last]).toBeLessThanOrEqual(crashPoint);
     expect(curve.points[last + 1]).toBeGreaterThan(crashPoint);
-    const samples = curveSamples(curve, last + 5, 0, crashPoint);
+    const samples = curveSamples(curve, last + 5.5, crashPoint);
     expect(samples.at(-1)?.value).toBe(2);
     expect(samples.every((sample) => sample.value <= 2)).toBe(true);
   });

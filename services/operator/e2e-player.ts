@@ -78,12 +78,12 @@ async function snapshot() {
   return { house, player, round: roundInfo ? decodeRound(roundInfo, PID) : null, slot: BigInt(context.slot) };
 }
 
-async function waitFor<T>(what: string, probe: () => Promise<T | null>, timeoutMs = 180_000): Promise<T> {
+async function waitFor<T>(what: string, probe: () => Promise<T | null>, timeoutMs = 300_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const value = await probe().catch(() => null);
     if (value !== null) return value;
-    await sleep(700);
+    await sleep(1_000);
   }
   throw new Error(`timed out waiting for ${what}`);
 }
@@ -124,12 +124,14 @@ async function main() {
       return s.round && s.round.phase === "Betting" && !played.includes(s.round.roundId) && s.slot + 8n < s.round.bettingEndSlot ? s : null;
     });
     const round = betting.round!;
-    const instructions: TransactionInstruction[] = [];
     const previous = betting.player?.activeBet;
-    if (previous) instructions.push(settleBetIx(PID, owner.publicKey, previous.roundId));
     const auto = mode === "auto" ? 15_000n : 0n;
-    instructions.push(placeBetIx(PID, owner.publicKey, session.publicKey, { roundId: round.roundId, stake: STAKE, autoCashOut: auto }));
-    if (!(await send("bet", instructions, [session]))) {
+    const bet = placeBetIx(PID, owner.publicKey, session.publicKey, { roundId: round.roundId, stake: STAKE, autoCashOut: auto });
+    let placed = await send("bet", previous ? [settleBetIx(PID, owner.publicKey, previous.roundId), bet] : [bet], [session]);
+    // Like the web (spec §6.2): the crank settles during betting too, so a bundled settlement may
+    // lose the race with NoActiveBet; retry once without it.
+    if (!placed && previous) placed = await send("bet-retry", [bet], [session]);
+    if (!placed) {
       failures.push(`bet in round ${round.roundId}`);
       continue;
     }

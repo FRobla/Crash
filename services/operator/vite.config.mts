@@ -15,7 +15,11 @@ export default defineConfig({
     target: "node24",
     sourcemap: false,
     rollupOptions: {
-      input: { operator: entry("./main.ts"), "e2e-player": entry("./e2e-player.ts") },
+      input: {
+        operator: entry("./main.ts"),
+        "e2e-player": entry("./e2e-player.ts"),
+        "admin-config": entry("./admin-config.ts"),
+      },
       output: { entryFileNames: "[name].mjs" },
     },
   },

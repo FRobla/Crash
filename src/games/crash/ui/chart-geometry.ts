@@ -52,11 +52,27 @@ export function toNumber(multiplier: Multiplier): number {
 }
 
 /**
- * Curve samples from tick 0 to `lastTick`, plus an interpolated tip `fraction` of the way to the
- * next tick. `cap` stops the curve at a revealed crash point.
+ * Multiplier at a fractional tick, interpolated exponentially between the curve's points (the
+ * curve itself grows exponentially). Presentation only: never offered, paid or compared.
  */
-export function curveSamples(curve: MultiplierCurve, lastTick: number, fraction = 0, cap: Multiplier | null = null): CurvePoint[] {
+export function interpolatedMultiplier(curve: MultiplierCurve, tick: number): number {
   const horizon = curve.points.length - 1;
+  if (!(tick > 0)) return toNumber(curve.points[0]);
+  if (tick >= horizon) return toNumber(curve.points[horizon]);
+  const index = Math.floor(tick);
+  const from = toNumber(curve.points[index]);
+  const to = toNumber(curve.points[index + 1]);
+  return from * (to / from) ** (tick - index);
+}
+
+/**
+ * Curve samples from tick 0 to a possibly fractional `tick`, whose fraction becomes an
+ * interpolated tip. `cap` stops the curve at a crash point.
+ */
+export function curveSamples(curve: MultiplierCurve, tick: number, cap: Multiplier | null = null): CurvePoint[] {
+  const horizon = curve.points.length - 1;
+  const lastTick = Math.max(0, tick);
+  const fraction = lastTick - Math.floor(lastTick);
   const end = Math.max(0, Math.min(Math.floor(lastTick), horizon));
   const samples: CurvePoint[] = [];
   for (let tick = 0; tick <= end; tick++) {
@@ -70,10 +86,9 @@ export function curveSamples(curve: MultiplierCurve, lastTick: number, fraction 
     }
     samples.push({ tick, value: toNumber(raw) });
   }
-  if (cap === null && fraction > 0 && end < horizon) {
-    const from = toNumber(curve.points[end]);
-    const to = toNumber(curve.points[end + 1]);
-    samples.push({ tick: end + fraction, value: from + (to - from) * fraction });
+  if (fraction > 0 && end < horizon) {
+    const value = interpolatedMultiplier(curve, end + fraction);
+    if (cap === null || value <= toNumber(cap)) samples.push({ tick: end + fraction, value });
   }
   return samples;
 }

@@ -7,6 +7,7 @@ import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import type { ReactNode } from "react";
 import { solanaConfig } from "../config";
 import { RpcHealthProvider } from "../network/RpcHealthProvider";
+import { reportWalletError } from "./wallet-errors";
 
 // Hoisted so the providers keep a stable Connection across renders.
 const CONNECTION_CONFIG: ConnectionConfig = { commitment: "confirmed" };
@@ -15,13 +16,14 @@ const CONNECTION_CONFIG: ConnectionConfig = { commitment: "confirmed" };
 const WALLET_ADAPTERS: [] = [];
 
 /**
- * Read-only wallet connection on devnet: no signing or transactions are wired yet.
- * autoConnect stays off until wallet sessions have a spec.
+ * Devnet wallet connection. `autoConnect` makes the provider connect as soon as a wallet is
+ * picked in the modal (the modal itself only selects it) and reconnect on reload. Signing only
+ * happens in the flows of spec crash-client-v1 §6.2. Adapter errors are shown by the control.
  */
 export function SolanaWalletProvider({ children }: { children: ReactNode }) {
   return (
     <ConnectionProvider endpoint={solanaConfig.rpcUrl} config={CONNECTION_CONFIG}>
-      <WalletProvider wallets={WALLET_ADAPTERS} autoConnect={false}>
+      <WalletProvider wallets={WALLET_ADAPTERS} autoConnect onError={reportWalletError}>
         <WalletModalProvider>
           <RpcHealthProvider>{children}</RpcHealthProvider>
         </WalletModalProvider>

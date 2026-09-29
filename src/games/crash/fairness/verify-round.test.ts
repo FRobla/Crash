@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import devnet from "./fixtures/devnet-rounds.json";
-import { computeCommitment, verifyRound, type RoundEvidence } from "./verify-round";
+import { computeCommitment, deriveOutcome, toHex, verifyRound, type RoundEvidence } from "./verify-round";
 
 function fromHex(hex: string): Uint8Array {
   return Uint8Array.from(hex.match(/../g) ?? [], (byte) => Number.parseInt(byte, 16));
@@ -69,6 +69,32 @@ describe("verifyRound", () => {
     expect(await verifyRound({ ...base, outcome: "pending" })).toEqual({ status: "unverifiable", reason: "pending" });
     expect(await verifyRound({ ...base, rulesVersion: 9 })).toEqual({ status: "unverifiable", reason: "unknown-rules" });
     expect(await verifyRound({ ...base, seed: new Uint8Array(31) })).toEqual({ status: "unverifiable", reason: "malformed" });
+  });
+
+  it("derives each revealed devnet round's commit, crash point and tick from its seed and VRF output", async () => {
+    for (const round of revealed) {
+      const base = evidence(round);
+      const outcome = await deriveOutcome(base.programId, base.roundId, base.rulesVersion, base.seed, base.vrfOutput);
+      expect(outcome, `round ${round.roundId}`).not.toBeNull();
+      expect(toHex(outcome!.commitment)).toBe(round.commit);
+      expect(outcome!.crashPoint).toBe(base.crashPoint);
+      expect(outcome!.crashTick).toBe(base.crashTick);
+    }
+  });
+
+  it("does not reproduce the commit or crash for a foreign seed, round or VRF output", async () => {
+    const [first, second] = revealed.map(evidence);
+    const derive = (e: RoundEvidence) => deriveOutcome(e.programId, e.roundId, e.rulesVersion, e.seed, e.vrfOutput);
+    const foreignSeed = await derive({ ...first, seed: second.seed });
+    const foreignRound = await derive({ ...first, roundId: second.roundId });
+    const foreignVrf = await derive({ ...first, vrfOutput: second.vrfOutput });
+    expect(toHex(foreignSeed!.commitment)).not.toBe(toHex(first.commit));
+    expect(toHex(foreignRound!.commitment)).not.toBe(toHex(first.commit));
+    // Same seed, so the commit still matches: only the entropy (and so the crash) changes.
+    expect(toHex(foreignVrf!.commitment)).toBe(toHex(first.commit));
+    expect(foreignVrf!.entropy).not.toEqual((await derive(first))!.entropy);
+    expect(await derive({ ...first, rulesVersion: 9 })).toBeNull();
+    expect(await derive({ ...first, vrfOutput: new Uint8Array(31) })).toBeNull();
   });
 
   it("binds the commitment to the program and the round id", async () => {

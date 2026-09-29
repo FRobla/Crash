@@ -2,7 +2,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { describe, expect, it } from "vitest";
 import type { HouseConfigAccount, RoundAccount, RoundPhase } from "@/chain-adapters/solana/crash-program/accounts";
-import { planNextAction, type CrankState } from "./plan";
+import { SETTLE_MARGIN_SLOTS, planNextAction, revealReady, settleWindowOpen, type CrankState } from "./plan";
 
 const KEY = PublicKey.default;
 
@@ -111,6 +111,28 @@ describe("planNextAction", () => {
       expect(plan({ round: round("Running"), hasSeed: false, slot: 1_200n })).toMatchObject({ kind: "wait", untilSlot: 1_446n });
       expect(plan({ round: round("Running"), hasSeed: false, slot: 1_446n })).toEqual({ kind: "forfeit", roundId: 7n });
     });
+  });
+
+  it("reveals only from the crash tick on, never a slot earlier", () => {
+    const running = round("Running", { startSlot: 1_100n });
+    expect(revealReady(running, 40n, 1_139n)).toBe(false);
+    expect(revealReady(running, 40n, 1_140n)).toBe(true);
+    expect(plan({ round: running, crashTick: 40n, slot: 1_139n }).kind).toBe("wait");
+    expect(plan({ round: running, crashTick: 0n, slot: 1_100n })).toEqual({ kind: "reveal", roundId: 7n });
+  });
+
+  it("settles only during a betting window with a margin before it closes", () => {
+    const betting = round("Betting", { bettingEndSlot: 1_050n });
+    expect(settleWindowOpen(betting, 1_000n)).toBe(true);
+    expect(settleWindowOpen(betting, 1_050n - SETTLE_MARGIN_SLOTS - 1n)).toBe(true);
+    expect(settleWindowOpen(betting, 1_050n - SETTLE_MARGIN_SLOTS)).toBe(false);
+    expect(settleWindowOpen(round("Running"), 1_000n)).toBe(false);
+    expect(settleWindowOpen(null, 1_000n)).toBe(false);
+  });
+
+  it("opens the next round before settling the previous one", () => {
+    // With no current round the plan opens at once; settlements wait for the betting window.
+    expect(plan({ config: config({ currentRound: null }), round: null }).kind).toBe("open");
   });
 
   it("does not act on a terminal current round", () => {

@@ -98,17 +98,50 @@ function curveFor(rules: CrashRules): MultiplierCurve {
   return curve;
 }
 
+export interface DerivedOutcome {
+  rules: CrashRules;
+  /** What `seed` commits to; the caller compares it with the round's recorded commit. */
+  commitment: Uint8Array;
+  entropy: Uint8Array;
+  crashPoint: Multiplier;
+  crashTick: bigint;
+}
+
+/**
+ * The outcome a seed and VRF output produce for a round, exactly as the program derives it.
+ * `null` for unknown rules or inputs that are not 32 bytes. Shared by the verifier, the crank and
+ * the web's provisional crash (spec crash-client-v1 §5.2).
+ */
+export async function deriveOutcome(
+  programId: Uint8Array,
+  roundId: bigint,
+  rulesVersion: number,
+  seed: Uint8Array,
+  vrfOutput: Uint8Array,
+  sha256: Sha256 = webCryptoSha256,
+): Promise<DerivedOutcome | null> {
+  const rules = rulesForVersion(rulesVersion);
+  if (!rules || [programId, seed, vrfOutput].some((bytes) => bytes.length !== 32)) return null;
+  const commitment = await computeCommitment(programId, roundId, seed, sha256);
+  const entropy = await computeEntropy(programId, roundId, seed, vrfOutput, sha256);
+  const crashPoint = crashPointFromEntropy(entropy, rules);
+  return { rules, commitment, entropy, crashPoint, crashTick: BigInt(crashTick(curveFor(rules), crashPoint)) };
+}
+
 export async function verifyRound(evidence: RoundEvidence, sha256: Sha256 = webCryptoSha256): Promise<Verification> {
   if (evidence.outcome !== "revealed") return { status: "unverifiable", reason: evidence.outcome };
-  const rules = rulesForVersion(evidence.rulesVersion);
-  if (!rules) return { status: "unverifiable", reason: "unknown-rules" };
-  const sizes = [evidence.programId, evidence.commit, evidence.seed, evidence.vrfOutput].map((b) => b.length);
-  if (sizes.some((size) => size !== 32)) return { status: "unverifiable", reason: "malformed" };
-
-  const commitment = await computeCommitment(evidence.programId, evidence.roundId, evidence.seed, sha256);
-  const entropy = await computeEntropy(evidence.programId, evidence.roundId, evidence.seed, evidence.vrfOutput, sha256);
-  const crashPoint = crashPointFromEntropy(entropy, rules);
-  const tick = BigInt(crashTick(curveFor(rules), crashPoint));
+  if (!rulesForVersion(evidence.rulesVersion)) return { status: "unverifiable", reason: "unknown-rules" };
+  if (evidence.commit.length !== 32) return { status: "unverifiable", reason: "malformed" };
+  const derived = await deriveOutcome(
+    evidence.programId,
+    evidence.roundId,
+    evidence.rulesVersion,
+    evidence.seed,
+    evidence.vrfOutput,
+    sha256,
+  );
+  if (!derived) return { status: "unverifiable", reason: "malformed" };
+  const { rules, commitment, entropy, crashPoint, crashTick: tick } = derived;
 
   const checks: VerificationCheck[] = [
     { name: "commitment", expected: toHex(evidence.commit), actual: toHex(commitment), ok: toHex(commitment) === toHex(evidence.commit) },

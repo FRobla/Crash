@@ -1,6 +1,6 @@
 # Spec — Versión funcional mínima: crank del operador, cliente web y verificación (v1)
 
-- Estado: **aprobada v1** (2026-09-29): el usuario aprueba las decisiones de la §11. **Implementada** (§13).
+- Estado: **aprobada v1** (2026-09-29): el usuario aprueba las decisiones de la §11. **Implementada** (§13). **Enmienda de jugabilidad** (iteración 9, 2026-09-29): ventana de 15 s, reloj de slots medido, canal en vivo del crank ([ADR 0004](../adr/0004-operator-live-feed.md), propuesto), apuesta en cola y sonidos; afecta a §4, §5, §6, §10 y §11.
 - Fecha: 2026-09-29
 - Programa: [spec v2](crash-program-v2.md) (vigente), sobre [v1.1](crash-program.md). Esta spec **no cambia el programa** ni las reglas: es un cliente del programa desplegado `DNmfJ…`.
 - Reglas: [`crash-round-rules.md`](crash-round-rules.md) v1, sin cambios. Randomness: [ADR 0002](../adr/0002-randomness-source.md). Cuentas de jugador: [ADR 0003](../adr/0003-player-accounts-and-sessions.md).
@@ -63,11 +63,15 @@ La clave privada y las semillas no reveladas nunca se escriben en logs, errores 
 | 3 | `close_betting` con el oráculo elegido (§4.5) | `slot ≥ betting_end_slot` | Reintenta con otro oráculo. Si no lo consigue antes de `betting_end_slot + entropy_timeout_slots`, `void_round` (puede hacerlo el operador en `Betting`) |
 | 4 | `start_round` con el payload del gateway (§4.5) | Nada más confirmar el commit | Reintenta hasta `entropy_deadline_slot`. Después, `void_round` sin permisos |
 | 5 | `reveal(seed)` | Cuando `slot ≥ start_slot + crash_tick`, calculado con el motor TS | Reintenta hasta `reveal_deadline_slot`. Si no lo logra, `forfeit_round` (lo pierde la casa, §10) |
-| 6 | `settle_bet` de cada `Player` con apuesta en la ronda | Fase terminal (`Crashed`, `Voided` o `Forfeited`) | Reintenta. Un jugador también puede liquidar en su siguiente apuesta; es idempotente (`NoActiveBet`) |
+| 6 | `settle_bet` de cada `Player` con apuesta en una ronda terminal | Durante la ventana de apuestas de la ronda **siguiente**, mientras `slot < betting_end_slot − 8` (la ronda nueva se abre antes) | Se reintenta en la ronda siguiente. Un jugador también puede liquidar en su siguiente apuesta; es idempotente (`NoActiveBet`) |
 | 7 | Borra la semilla de disco | `reveal` confirmado (la semilla ya es pública) | — |
 
 - **Apuestas de la ronda:** `getProgramAccounts` con filtros `memcmp` sobre el discriminador de `Player`, `active_bet = Some` (offset 73 = `1`) y `active_bet.round_id` (offset 74). El crank no confía en los eventos para saber a quién pagar.
-- **Confirmaciones:** se espera a `confirmed` antes de avanzar de paso, **consultando el estado de la firma** (sin WebSocket: la RPC pública limita las suscripciones y `confirmTransaction` de web3.js dejaba rechazos sin capturar). Cada transacción lleva priority fee (§11, 6); si caduca, el siguiente paso la reconstruye con un blockhash nuevo. Un rechazo no capturado de una librería se registra y el bucle sigue: cada decisión se vuelve a derivar de la cadena.
+- **Confirmaciones:** se espera a `confirmed` antes de avanzar de paso, **consultando el estado de la firma** (sin WebSocket: la RPC pública limita las suscripciones y `confirmTransaction` de web3.js dejaba rechazos sin capturar). Cada transacción lleva priority fee (§11, 6); si caduca, el siguiente paso la reconstruye con un blockhash nuevo. Antes de declarar caducada una firma se busca en el historial (`searchTransactionHistory`): tras una racha de 429, una transacción que aterrizó puede haber salido ya de la caché reciente de estados. Un rechazo no capturado de una librería se registra y el bucle sigue: cada decisión se vuelve a derivar de la cadena.
+
+- **Abrir antes de liquidar** (iteración 9): tras el `reveal`, `void` o `forfeit`, el crank abre la ronda siguiente de inmediato y liquida durante sus apuestas. Antes liquidaba primero, y la pausa sin apuestas duraba 3–13 s con la RPC pública.
+- **Espera dirigida al slot:** para cerrar apuestas y para el `reveal`, el crank duerme hasta la hora prevista del slot objetivo (con la duración de slot medida, §5.1) y solo en los últimos ≈ 1.5 s sondea `getSlot("confirmed")` cada ≈ 500 ms. No sondea más a menudo para no provocar 429.
+- **Preflight obligatorio:** ninguna transacción del crank se envía con `skipPreflight`, y el `reveal` lo comprueba de forma explícita. El envío (simulación + `sendRawTransaction`) y la confirmación son pasos separados: el canal en vivo (§4.7) publica la semilla entre ambos.
 
 ### 4.3 Recuperación tras reinicio
 
@@ -98,12 +102,37 @@ Se escribe a mano, como el adaptador on-chain, a partir del SDK `@switchboard-xy
 - `pnpm operator` compila `services/operator/main.ts` en un bundle Node con Vite en modo SSR (Vite ya está en el lockfile vía Vitest; pasa a ser devDependency directa, sin paquetes nuevos) y lo ejecuta con Node 24, leyendo `.env.operator` (ignorado por git; plantilla en `services/operator/operator.env.example`).
 - `pnpm operator:e2e` ejecuta el jugador end-to-end de devnet (§12) con el mismo bundle.
 - Logs en líneas JSON: ronda, fase, firma de la transacción, error y slot. Sin semillas no reveladas ni claves.
+- `pnpm operator:config -- --betting-seconds <s>` (script de admin, `services/operator/admin-config.ts`): lee `HouseConfig`, exige que el keypair sea `config.admin`, convierte segundos en slots con la duración de slot medida y envía `update_config` cambiando **solo** `betting_slots` (el resto se copia de la cuenta leída). Relee la cuenta y comprueba el resultado. No exige que no haya ronda activa: cada ronda guarda su `betting_end_slot`.
+
+### 4.7 Canal en vivo (ADR 0004, solo presentación)
+
+- SSE en `http://127.0.0.1:<CRASH_OPERATOR_LIVE_PORT>/events` (por defecto 8787; 0 lo desactiva), con `node:http` y sin dependencias. CORS solo para `CRASH_OPERATOR_LIVE_ORIGIN` (por defecto `http://localhost:3000`); una petición con otro `Origin` recibe 403. Máximo 16 conexiones; heartbeat cada 15 s.
+- Eventos (JSON en `data:`, ids en decimal):
+  - `{"type":"phase","roundId":"42","phase":"opened"|"betting-closed"|"started"|"revealed"|"voided"|"forfeited"}` tras confirmar la instrucción correspondiente;
+  - `{"type":"crashed","roundId":"42","seedHex":"<64 hex>"}` **solo después de que el `reveal` pase el preflight** y antes de su confirmación.
+- Al conectar se envían la última pista de fase y el último `crashed`, si existen.
+- La web solo lo usa para presentación: adelantar un sondeo y mostrar un crash provisional verificado (§5.2).
 
 ## 5. Web — datos en vivo
 
 - **Fuentes:** una sola consulta `getMultipleAccounts` por segundo con `HouseConfig`, la `Round` más reciente, la `Player` del usuario y los saldos de su wallet y de su clave de sesión; el `slot` sale del contexto de la respuesta. Sin WebSocket: en la práctica, la RPC pública devolvía 429 a las suscripciones. Si las consultas fallan más de 5 s, el feed se marca `stale`, y un 429 de la RPC se muestra como `rate-limited`, no como caída.
 - **Estado autoritativo:** solo las cuentas leídas con compromiso `confirmed`. Lo que llega con `processed` se muestra como "pendiente".
-- **Multiplicador en vivo (proyección):** `tick = slot_actual − start_slot` y `multiplierAtTick(CRASH_RULES_V1, tick)`. Se etiqueta como estimado. El cliente no conoce el crash point hasta el `reveal`: hasta entonces la curva sigue subiendo, aunque ya haya pasado el crash.
+- **Multiplicador en vivo (proyección):** `tick = slot_actual − start_slot` y `multiplierAtTick(CRASH_RULES_V1, tick)`. Se etiqueta como estimado. Sin canal en vivo, el cliente no conoce el crash point hasta el `reveal`: hasta entonces la curva sigue subiendo, aunque ya haya pasado el crash.
+
+### 5.1 Reloj de slots medido (iteración 9)
+
+- La duración real de un slot en devnet es ≈ 230 ms, no los 400 ms nominales. El cliente y el crank la miden: valor inicial de `getRecentPerformanceSamples`, refinado por regresión lineal sobre las observaciones de los últimos ≈ 15 s y acotado a 150–600 ms. Cuentas atrás, ejes en segundos y caducidad de la sesión usan esa medida.
+- La proyección del slot es **continua y monótona**: entre sondeos avanza con la tasa medida; ante un error la corrige cambiando la velocidad (0.5×–1.5×) y solo salta si el error supera 8 slots.
+- El sondeo usa una `Connection` con `disableRetryOnRateLimit: true`: un 429 cuenta como un sondeo fallido, en vez de bloquearlo hasta 7.5 s. Tras 429 seguidos, el siguiente sondeo espera 2, 4, 8 y como máximo 16 s, y las pistas del canal no lo adelantan; la primera respuesta correcta vuelve al ritmo de 1 s. Cada sondeo fecha la observación en el punto medio de la petición.
+
+### 5.2 Presentación de la ronda en vivo (iteración 9)
+
+- **Titular continuo (solo presentación):** mientras corre la ronda, el número grande interpola exponencialmente entre los puntos de la curva con la fracción del slot proyectado. Se **relaja** la regla anterior ("la fracción nunca alimenta un número mostrado") solo para ese titular y la curva: la **oferta de cash-out y los resultados siguen en ticks enteros** (`estimatedTick = floor(projectedTick)`), y el titular nunca supera un crash verificado.
+- **Curva ≈ 1 slot por detrás** de la proyección (buffer de jitter), para que suba exactamente hasta el crash verificado; si el crash llega tarde, baja al crash point.
+- **Crash provisional verificado:** si el canal en vivo entrega `crashed` para la ronda actual y `deriveOutcome(program_id, round_id, rules_version, seed, vrf_output)` reproduce el `commit` on-chain, la web muestra el crash con la etiqueta "verified · on-chain reveal pending", deja de ofrecer cash-out y calcula el resultado de la apuesta con las reglas (auto con objetivo ≤ crash point → gana, pendiente de liquidación). En cuanto la cuenta está revelada manda la cuenta; si acaba en `Forfeited` o `Voided`, el provisional se sustituye.
+- **Transiciones:** el crash se mantiene visible ≥ 2.5 s aunque la ronda siguiente ya acepte apuestas, y luego se funde con la cuenta atrás; anillo de cuenta atrás continuo con decimales y pulso en los últimos 3 s; estado "launching" mientras llega la randomness; skeleton al cargar en vez de un estado "idle".
+- **Sonidos** sintetizados con WebAudio (cuenta atrás, despegue, cash-out, crash), **desactivados por defecto**, con un botón de silencio y la preferencia en `localStorage`.
+- **`prefers-reduced-motion`:** sin número continuo (solo ticks enteros), sin fundidos ni sacudidas y cuenta atrás en segundos enteros.
 - **Fin de ronda:** el crash point que se muestra es siempre `Round.crash_point` tras el `reveal`. Una ronda `Voided` o `Forfeited` se muestra como tal, con su efecto en la apuesta (reembolso o pago según la regla).
 - **Ronda anterior sin revelar mientras corre el reloj:** la UI nunca muestra una ganancia como definitiva antes de `settle_bet` (o de verla reflejada en `Player.balance`).
 
@@ -127,6 +156,9 @@ Se escribe a mano, como el adaptador on-chain, a partir del SDK `@switchboard-xy
 - **Nombre:** se valida en el cliente con las mismas reglas que el programa (`[a-z0-9_]`, 3–16) y se comprueba que el `UsernameRecord` no exista antes de firmar. El programa sigue siendo quien decide.
 - **Valores por defecto de la sesión:** 216 000 slots (≈ 24 h), `spend_cap` = saldo tras la compra y `fee_budget` = 0.01 SOL (spec v2 §6). El usuario puede cambiar `spend_cap`.
 - **Auto cash-out:** multiplicador opcional con 2 decimales (`≥ 1.01x`, `≤` máximo de las reglas), convertido a diezmilésimas. Lo aplica el programa al liquidar: no necesita transacción. Cuando el multiplicador estimado alcanza el auto cash-out, la web deja de ofrecer el cash-out manual (el automático gana cualquier empate o cash-out posterior, reglas §6) y lo indica como "alcanzado (estimado)", sin darlo por ganado hasta el `reveal`.
+- **Apuesta en la siguiente ronda (cola):** con la sesión activa y una ronda que ya no admite apuestas, el jugador puede dejar **una** apuesta en cola, solo en memoria y cancelable. Al abrirse la ronda siguiente se revalida con `checkNewBet` y se envía una vez. Se borra si la wallet o la sesión dejan de ser válidas, si cambian los límites de la casa o si baja el saldo.
+- **Carrera con el crank que liquida:** si una apuesta que incluía el `settle_bet` de la anterior falla con `NoActiveBet` (el crank la liquidó antes), se reintenta **una vez** sin `settle_bet`.
+- **Monedas de prueba (solo devnet):** la cuenta ofrece la guía de devnet (wallet en modo devnet, `faucet.solana.com`) y un airdrop de la RPC a mejor esfuerzo, con un error claro si la RPC lo limita.
 - **Validación previa:** antes de firmar se aplican `validateBet` y los límites de `HouseConfig`, y se comprueba que la sesión no esté caducada ni agote el tope. Un error del programa se muestra con su nombre (`BettingClosed`, `SessionSpendCapExceeded`…), nunca como éxito.
 
 ### 6.3 Clave de sesión en el navegador
@@ -182,6 +214,9 @@ Se escribe a mano, como el adaptador on-chain, a partir del SDK `@switchboard-xy
 | API key de la RPC filtrada al oráculo | El gateway recibe siempre la RPC pública |
 | Keypair del operador en el repo | El crank se niega a arrancar con rutas dentro del repo; `.gitignore` sin cambios de riesgo |
 | Doble envío de una transacción | Todas las instrucciones son idempotentes o fallan sin efectos (`InvalidPhase`, `NoActiveBet`, `ActiveBetPending`) |
+| Canal en vivo malicioso o caído (ADR 0004) | Solo presentación: la web valida la forma y verifica la semilla contra el commit on-chain antes de mostrar nada; sin canal, usa solo la cadena |
+| Semilla publicada por el canal antes del crash | Solo tras el preflight del `reveal` (banco `confirmed` en `slot ≥ start_slot + crash_tick`); `reveal` nunca con `skipPreflight` |
+| Apuesta en cola enviada fuera de las reglas | Solo con sesión activa en este dispositivo; se revalida con `checkNewBet` y los límites vigentes, y el programa decide |
 
 ## 11. Decisiones pendientes de aprobación
 
@@ -191,7 +226,7 @@ Se escribe a mano, como el adaptador on-chain, a partir del SDK `@switchboard-xy
 | 2 | Cómo se ejecuta el crank | Bundle con Vite (SSR) + Node 24 (§4.6). Alternativa: `tsx`, que añade `esbuild` con script de instalación |
 | 3 | Dónde vive el crank | `services/operator/` en la raíz, fuera de `src/`, que es la app web |
 | 4 | Idioma de la UI | Inglés, como la interfaz actual, hasta que se definan los requisitos de localización |
-| 5 | Pausa entre rondas | 3 s tras la liquidación, configurable en el crank |
+| 5 | Pausa entre rondas | **Aprobado (2026-09-29, iteración 9):** juego continuo con **15 s de apuestas**. `betting_slots` se fija con `pnpm operator:config -- --betting-seconds 15` usando la duración de slot medida (≈ 65 slots a ≈ 230 ms). El crank abre la ronda siguiente nada más terminar la anterior y liquida durante sus apuestas (`CRASH_OPERATOR_PAUSE_MS`, por defecto 0). La espera de randomness (≈ 5–9 s) va aparte y no es tiempo de apuesta. Antes: 13 slots (≈ 3 s reales) |
 | 6 | Priority fee del crank | 1 000 micro-lamports/CU, configurable |
 | 7 | Límites de la casa de devnet | Sin cambios: stake de 1–2 monedas, pago máximo de 200 y exposición de 500 por ronda |
 

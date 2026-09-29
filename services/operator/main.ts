@@ -18,10 +18,12 @@ import { SWITCHBOARD_PROGRAM_ID, revealSideAccounts } from "@/chain-adapters/sol
 import { fetchRevealPayload } from "@/chain-adapters/solana/switchboard/gateway";
 import { rankOracles } from "@/chain-adapters/solana/switchboard/oracle-selection";
 import { computeCommitment } from "@/games/crash/fairness/verify-round";
+import { SlotClock } from "@/chain-adapters/solana/network/slot-clock";
 import { OperatorChain, type SendResult } from "./chain";
 import { parseOperatorConfig } from "./config";
+import { DISABLED_FEED, FEED_PATH, SseLiveFeed, type LiveFeed } from "./live-feed";
 import { createLogger } from "./logger";
-import { planNextAction, type CrankAction } from "./plan";
+import { SETTLE_MARGIN_SLOTS, planNextAction, settleWindowOpen, type CrankAction } from "./plan";
 import { expectedCrash, seedMatchesCommit } from "./round-math";
 import { createFileSeedStore, type SeedStore } from "./seed-store";
 
@@ -32,6 +34,10 @@ import { createFileSeedStore, type SeedStore } from "./seed-store";
  */
 
 const SETTLEMENTS_PER_TRANSACTION = 4;
+/** Slot-targeted waits: sleep until this close to the target, then poll the slot. */
+const FINAL_APPROACH_MS = 1_500;
+const SLOT_POLL_MS = 500;
+const MAX_SLEEP_MS = 10_000;
 const MIN_OPERATOR_LAMPORTS = 50_000_000n;
 
 const log = createLogger();
@@ -48,17 +54,27 @@ class Crank {
   /** Oracles that failed a commit, per round, so a retry picks another one. */
   private readonly failedOracles = new Map<bigint, Set<string>>();
   private lastRoundEndedAt = 0;
+  /** Round whose betting window already ran the settlement pass. */
+  private settledDuring: bigint | null = null;
   private stopping = false;
+  private readonly clock = new SlotClock();
 
   constructor(
     private readonly chain: OperatorChain,
     private readonly seeds: SeedStore,
+    private readonly feed: LiveFeed,
     private readonly pauseMs: number,
     private readonly pollMs: number,
   ) {}
 
   stop(): void {
     this.stopping = true;
+  }
+
+  async calibrate(): Promise<void> {
+    const measured = await this.chain.measuredMsPerSlot();
+    if (measured !== null) this.clock.setBaseline(measured);
+    log.info("slot-clock", { msPerSlot: Math.round(this.clock.msPerSlot()) });
   }
 
   async run(): Promise<void> {
@@ -75,6 +91,7 @@ class Crank {
 
   private async step(): Promise<void> {
     const { config, round, slot } = await this.chain.snapshot();
+    this.clock.observe(slot, Date.now());
     let hasSeed = false;
     let crashTick: bigint | null = null;
     if (round) {
@@ -88,23 +105,48 @@ class Crank {
 
     const action = planNextAction({ config, round, slot, hasSeed, crashTick });
     if (action.kind === "open") {
-      if (await this.settlePending()) return;
+      // The next round opens first; settlements run during its betting window (spec §4.2).
       const waitMs = this.lastRoundEndedAt + this.pauseMs - Date.now();
       if (waitMs > 0) return sleep(Math.min(waitMs, this.pollMs));
     }
-    await this.execute(action, round);
+    if (action.kind === "wait" && round && hasSeed && settleWindowOpen(round, slot) && this.settledDuring !== round.roundId) {
+      this.settledDuring = round.roundId;
+      const stopAt = Date.now() + Number(round.bettingEndSlot - SETTLE_MARGIN_SLOTS - slot) * this.clock.msPerSlot();
+      await this.settlePending(stopAt);
+      return;
+    }
+    await this.execute(action, round, slot);
   }
 
-  private async execute(action: CrankAction, round: RoundAccount | null): Promise<void> {
+  /**
+   * Sleeps until the slot is due at the measured rate, then polls `getSlot` every 500 ms only for
+   * the last ≈ 1.5 s: close to the target without hammering a rate-limited RPC.
+   */
+  private async waitForSlot(untilSlot: bigint | null, slot: bigint): Promise<void> {
+    if (untilSlot === null) return sleep(this.pollMs);
+    const remainingMs = Number(untilSlot - slot) * this.clock.msPerSlot();
+    if (remainingMs > FINAL_APPROACH_MS) return sleep(Math.min(remainingMs - FINAL_APPROACH_MS, MAX_SLEEP_MS));
+    const giveUpAt = Date.now() + FINAL_APPROACH_MS * 2;
+    while (!this.stopping && Date.now() < giveUpAt) {
+      const current = await this.chain.slot();
+      this.clock.observe(current, Date.now());
+      if (current >= untilSlot) return;
+      await sleep(SLOT_POLL_MS);
+    }
+  }
+
+  private async execute(action: CrankAction, round: RoundAccount | null, slot: bigint): Promise<void> {
     const pid = CRASH_PROGRAM_ID;
     const operator = this.chain.operator.publicKey;
     switch (action.kind) {
       case "wait":
-        return sleep(this.pollMs);
+        return this.waitForSlot(action.untilSlot, slot);
       case "open": {
         const seed = this.seeds.getOrCreate(action.roundId, () => new Uint8Array(randomBytes(32)));
         const commit = await computeCommitment(this.programIdBytes, action.roundId, seed);
-        this.report(action, await this.chain.send([openRoundIx(pid, operator, action.roundId, commit)]));
+        const result = await this.chain.send([openRoundIx(pid, operator, action.roundId, commit)]);
+        this.report(action, result);
+        if (result.ok) this.feed.phase(action.roundId, "opened");
         return;
       }
       case "close-betting":
@@ -113,21 +155,33 @@ class Crank {
         return this.start(round!);
       case "reveal": {
         const seed = this.seeds.read(action.roundId)!;
-        const result = await this.chain.send([revealIx(pid, action.roundId, seed)]);
+        // The seed reaches the live feed only after the reveal passed preflight (ADR 0004).
+        const result = await this.chain.send([revealIx(pid, action.roundId, seed)], {
+          onSubmitted: () => this.feed.crashed(action.roundId, seed),
+        });
         this.report(action, result);
-        if (result.ok) await this.afterReveal(action.roundId, seed, round!);
+        if (result.ok) {
+          this.feed.phase(action.roundId, "revealed");
+          await this.afterReveal(action.roundId, seed, round!);
+        }
         return;
       }
       case "void": {
         const result = await this.chain.send([voidRoundIx(pid, operator, action.roundId)]);
         this.report(action, result);
-        if (result.ok) this.endRound(action.roundId);
+        if (result.ok) {
+          this.feed.phase(action.roundId, "voided");
+          this.endRound(action.roundId);
+        }
         return;
       }
       case "forfeit": {
         const result = await this.chain.send([forfeitRoundIx(pid, action.roundId)]);
         this.report(action, result);
-        if (result.ok) this.endRound(action.roundId);
+        if (result.ok) {
+          this.feed.phase(action.roundId, "forfeited");
+          this.endRound(action.roundId);
+        }
         return;
       }
     }
@@ -156,7 +210,8 @@ class Crank {
       }),
     ]);
     this.report({ kind: "close-betting", roundId }, result, { oracle: oracle.key.toBase58() });
-    if (!result.ok) {
+    if (result.ok) this.feed.phase(roundId, "betting-closed");
+    else {
       failed.add(oracle.key.toBase58());
       this.failedOracles.set(roundId, failed);
     }
@@ -200,6 +255,7 @@ class Crank {
       ),
     ]);
     this.report({ kind: "start", roundId: round.roundId }, result);
+    if (result.ok) this.feed.phase(round.roundId, "started");
   }
 
   private async afterReveal(roundId: bigint, seed: Uint8Array, before: RoundAccount): Promise<void> {
@@ -223,21 +279,24 @@ class Crank {
   }
 
   /**
-   * Settles bets of finished rounds; returns true if any settlement landed. Failures never block
-   * the next round: players can also settle in their next bet (spec §4.2).
+   * Settles bets of finished rounds until `stopAt` (ms); returns how many landed. Failures never
+   * block a round: the next window retries, and players can also settle in their next bet (§4.2).
    */
-  private async settlePending(): Promise<boolean> {
+  private async settlePending(stopAt: number): Promise<number> {
     const pending = await this.chain.pendingBets();
-    if (pending.length === 0) return false;
+    if (pending.length === 0) return 0;
     const phases = new Map<bigint, boolean>();
     for (const roundId of new Set(pending.map((bet) => bet.roundId))) {
       const round = await this.chain.round(roundId);
       phases.set(roundId, round !== null && isTerminalPhase(round.phase));
     }
     const settleable = pending.filter((bet) => phases.get(bet.roundId));
-    if (settleable.length === 0) return false;
     let settled = 0;
     for (let index = 0; index < settleable.length; index += SETTLEMENTS_PER_TRANSACTION) {
+      if (Date.now() >= stopAt) {
+        log.info("settle-deferred", { bets: settleable.length - index });
+        break;
+      }
       const batch = settleable.slice(index, index + SETTLEMENTS_PER_TRANSACTION);
       const result = await this.chain.send(batch.map((bet) => settleBetIx(CRASH_PROGRAM_ID, bet.owner, bet.roundId)));
       if (result.ok) settled += batch.length;
@@ -246,7 +305,7 @@ class Crank {
         ...(result.ok ? { signature: result.signature } : { error: result.programError ?? result.error }),
       });
     }
-    return settled > 0;
+    return settled;
   }
 
   private report(action: CrankAction, result: SendResult, extra: Record<string, unknown> = {}): void {
@@ -275,12 +334,26 @@ async function main(): Promise<void> {
     rpcHost: new URL(config.rpcUrl).host,
     lamports: String(balance),
   });
+  let feed: LiveFeed = DISABLED_FEED;
+  if (config.liveFeed) {
+    const sse = new SseLiveFeed(config.liveFeed);
+    try {
+      const address = await sse.listen();
+      feed = sse;
+      log.info("live-feed", { url: `http://127.0.0.1:${address.port}${FEED_PATH}`, origin: config.liveFeed.allowedOrigin });
+    } catch (error) {
+      // The feed is presentation only: the crank runs without it.
+      log.warn("live-feed-unavailable", { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
   const crank = new Crank(
     chain,
     createFileSeedStore(join(config.stateDir, CRASH_PROGRAM_ID.toBase58())),
+    feed,
     config.pauseBetweenRoundsMs,
     config.pollIntervalMs,
   );
+  await crank.calibrate();
   for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => crank.stop());
   // A stray rejection inside a library (e.g. a throttled RPC call) must not kill the crank: every
   // decision is re-derived from the chain on the next step, so continuing equals a restart.
@@ -288,6 +361,7 @@ async function main(): Promise<void> {
     log.error("unhandled-rejection", { error: reason instanceof Error ? reason.message.split("\n")[0] : String(reason) }),
   );
   await crank.run();
+  await feed.close();
 }
 
 main().catch((error) => {

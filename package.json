@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "operator:build": "vite build --config services/operator/vite.config.mts",
     "operator": "pnpm operator:build && node --env-file-if-exists=.env.operator services/operator/dist/operator.mjs",
-    "operator:e2e": "pnpm operator:build && node --env-file-if-exists=.env.operator services/operator/dist/e2e-player.mjs"
+    "operator:e2e": "pnpm operator:build && node --env-file-if-exists=.env.operator services/operator/dist/e2e-player.mjs",
+    "operator:config": "pnpm operator:build && node --env-file-if-exists=.env.operator services/operator/dist/admin-config.mjs"
   },
   "dependencies": {
     "@solana/wallet-adapter-base": "^0.9.28",

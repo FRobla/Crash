@@ -72,13 +72,17 @@ describe("session view", () => {
   const session = { key, expiresSlot: 1_000n, spendCap: 5_000_000n, spent: 1_000_000n };
 
   it("is active only with the matching local key, before expiry and with fee budget", () => {
-    expect(sessionView(player(session), key, 999n, 1_000_000n).status).toBe("active");
-    expect(sessionView(player(session), key, 1_000n, 1_000_000n).status).toBe("active");
-    expect(sessionView(player(session), key, 1_001n, 1_000_000n).status).toBe("expired");
-    expect(sessionView(player(session), Keypair.generate().publicKey, 999n, 1_000_000n).status).toBe("other-device");
-    expect(sessionView(player(session), null, 999n, 1_000_000n).status).toBe("other-device");
-    expect(sessionView(player(session), key, 999n, 9_999n).status).toBe("out-of-fees");
-    expect(sessionView(player(null), key, 999n, 1_000_000n).status).toBe("none");
+    expect(sessionView(player(session), key, 999n, 1_000_000n, 400).status).toBe("active");
+    expect(sessionView(player(session), key, 1_000n, 1_000_000n, 400).status).toBe("active");
+    expect(sessionView(player(session), key, 1_001n, 1_000_000n, 400).status).toBe("expired");
+    expect(sessionView(player(session), Keypair.generate().publicKey, 999n, 1_000_000n, 400).status).toBe("other-device");
+    expect(sessionView(player(session), null, 999n, 1_000_000n, 400).status).toBe("other-device");
+    expect(sessionView(player(session), key, 999n, 9_999n, 400).status).toBe("out-of-fees");
+    expect(sessionView(player(null), key, 999n, 1_000_000n, 400).status).toBe("none");
+  });
+
+  it("estimates the expiry with the measured slot duration", () => {
+    expect(sessionView(player(session), key, 900n, 1_000_000n, 230).expiresInSeconds).toBeCloseTo(23, 5);
   });
 
   it("blocks betting with an explanation until everything is ready", () => {
@@ -118,5 +122,12 @@ describe("live round mapping", () => {
     const crashed = toLiveRound({ ...base, phase: "Crashed", startSlot: 60n, crashPoint: 25_000n, crashTick: 39n });
     expect(crashed).toMatchObject({ phase: "crashed", crashPoint: 25_000n, crashTick: 39n });
     expect(toLiveRound({ ...base, phase: "Betting" })).toMatchObject({ startTick: null, commitHex: "ab".repeat(32) });
+  });
+
+  it("exposes the confirmed VRF output only once the round has started, and the opening slot", () => {
+    const vrfOutput = new Uint8Array(32).fill(0xcd);
+    expect(toLiveRound({ ...base, phase: "Betting", vrfOutput })).toMatchObject({ vrfOutputHex: null, openedTick: base.openedSlot });
+    expect(toLiveRound({ ...base, phase: "AwaitingEntropy", vrfOutput }).vrfOutputHex).toBeNull();
+    expect(toLiveRound({ ...base, phase: "Running", vrfOutput }).vrfOutputHex).toBe("cd".repeat(32));
   });
 });

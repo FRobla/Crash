@@ -138,7 +138,7 @@ Propuestos en ADR 0003 y aceptados por el usuario. Los dos primeros viven en `Ho
 | --- | --- | --- |
 | `max_session_slots` | 1 512 000 (≈ 7 días a 400 ms/slot) | `> 0` |
 | `username_cooldown_slots` | 1 512 000 (≈ 7 días) | Ninguna; 0 = sin enfriamiento |
-| `betting_slots` / `entropy_timeout_slots` / `reveal_grace_slots` | **50 / 300 / 150** (desde el 2026-09-29; antes 25/150/150) | `> 0`. Se cambian con `update_config`; conviene hacerlo sin ronda activa, porque `close_betting` usa el valor vigente para fijar el plazo de la entropía |
+| `betting_slots` / `entropy_timeout_slots` / `reveal_grace_slots` | **≈ 65 / 300 / 150** (desde el 2026-09-29, iteración 9: `betting_slots` = 15 s con la duración de slot medida de devnet, ≈ 230 ms; el valor exacto y su firma, en `changelog.md`. Antes 13, 50 y 25 slots de apuestas) | `> 0`. Se cambian con `update_config` (`pnpm operator:config`). `betting_slots` se puede cambiar con una ronda activa: cada ronda guarda su `betting_end_slot`. Los timeouts conviene cambiarlos sin ronda activa, porque `close_betting` usa el valor vigente para fijar el plazo de la entropía |
 | Duración de la sesión (UI) | 216 000 slots (≈ 24 h) | `≤ max_session_slots` |
 | `spend_cap` (UI) | El saldo en el momento de crear la sesión; el usuario puede cambiarlo | `> 0` |
 | `fee_budget` (UI) | 0.01 SOL (≈ 2 000 transacciones con la comisión base) | Ninguna. Debe superar el mínimo exento de rent de una cuenta de 0 bytes (≈ 0.00089 SOL); si no, el runtime rechaza la transferencia |

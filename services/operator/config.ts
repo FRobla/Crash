@@ -14,15 +14,22 @@ export interface OperatorConfig {
   pauseBetweenRoundsMs: number;
   priorityFeeMicroLamports: number;
   pollIntervalMs: number;
+  /** Local SSE channel (ADR 0004); null when disabled. */
+  liveFeed: { port: number; allowedOrigin: string } | null;
 }
 
 const schema = z.object({
   CRASH_OPERATOR_KEYPAIR: z.string().min(1, "CRASH_OPERATOR_KEYPAIR is required (path to the operator keypair)"),
   CRASH_OPERATOR_STATE_DIR: z.string().min(1, "CRASH_OPERATOR_STATE_DIR is required (directory for round seeds)"),
   CRASH_OPERATOR_RPC_URL: z.url({ protocol: /^https$/ }).optional(),
-  CRASH_OPERATOR_PAUSE_MS: z.coerce.number().int().min(0).max(60_000).default(3_000),
+  CRASH_OPERATOR_PAUSE_MS: z.coerce.number().int().min(0).max(60_000).default(0),
   CRASH_OPERATOR_PRIORITY_FEE: z.coerce.number().int().min(0).max(1_000_000).default(1_000),
   CRASH_OPERATOR_POLL_MS: z.coerce.number().int().min(200).max(10_000).default(800),
+  CRASH_OPERATOR_LIVE_PORT: z.coerce.number().int().min(0).max(65_535).default(8787),
+  CRASH_OPERATOR_LIVE_ORIGIN: z
+    .url({ protocol: /^https?$/ })
+    .refine((value) => new URL(value).origin === value, "must be a bare origin such as http://localhost:3000")
+    .default("http://localhost:3000"),
 });
 
 /** True when `target` resolves inside `root` (or is `root`). */
@@ -32,7 +39,9 @@ export function isInside(root: string, target: string): boolean {
 }
 
 export function parseOperatorConfig(env: Record<string, string | undefined>, repoRoot: string): OperatorConfig {
-  const result = schema.safeParse(env);
+  // `NAME=` lines of an env file mean "use the default", not an empty value.
+  const present = Object.fromEntries(Object.entries(env).filter(([, value]) => value !== undefined && value.trim() !== ""));
+  const result = schema.safeParse(present);
   // The message lists what is wrong, never the values.
   if (!result.success) throw new Error(`Invalid operator configuration: ${z.prettifyError(result.error)}`);
   const values = result.data;
@@ -49,5 +58,9 @@ export function parseOperatorConfig(env: Record<string, string | undefined>, rep
     pauseBetweenRoundsMs: values.CRASH_OPERATOR_PAUSE_MS,
     priorityFeeMicroLamports: values.CRASH_OPERATOR_PRIORITY_FEE,
     pollIntervalMs: values.CRASH_OPERATOR_POLL_MS,
+    liveFeed:
+      values.CRASH_OPERATOR_LIVE_PORT === 0
+        ? null
+        : { port: values.CRASH_OPERATOR_LIVE_PORT, allowedOrigin: values.CRASH_OPERATOR_LIVE_ORIGIN },
   };
 }

@@ -1,7 +1,17 @@
 "use client";
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Keypair, PublicKey, SystemProgram, Transaction, type TransactionInstruction } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  type TransactionInstruction,
+} from "@solana/web3.js";
+import { classifyRpcError, rateLimitBackoffMs } from "../network/rpc-health";
+import { SlotClock, msPerSlotFromSamples } from "../network/slot-clock";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   decodeHouseConfig,
@@ -23,12 +33,13 @@ import {
   sellCoinsIx,
   settleBetIx,
 } from "./instructions";
+import { LIVE_FEED_URL, connectOperatorFeed, type FeedStatus } from "./operator-feed";
 import { houseConfigAddress, playerAddress, roundAddress, usernameRecordAddress } from "./pdas";
-import { failureReason, sendSigned } from "./send";
+import { confirmSignature, failureReason, sendSigned } from "./send";
 import { browserStorage, clearSessionKey, loadSessionKey, saveSessionKey } from "./session-key-store";
 import {
-  APPROX_SECONDS_PER_SLOT,
   MIN_SESSION_FEE_LAMPORTS,
+  airdropFailureReason,
   playerBlocker,
   sessionView,
   toLiveRound,
@@ -38,11 +49,18 @@ import {
 /**
  * Solana implementation of the live game and player account ports (docs/specs/crash-client-v1.md
  * §5–6). State comes from confirmed accounts polled in a single `getMultipleAccounts` call per
- * second; the slot clock is interpolated between polls only for the labeled projection.
+ * second; a measured slot clock projects the slot between polls, only for labeled projections
+ * (§5.1). The crank's optional live feed only triggers earlier polls and carries a seed the UI
+ * verifies before showing a provisional crash (ADR 0004).
  */
 
 const PID = CRASH_PROGRAM_ID;
+const PROGRAM_ID_HEX = Array.from(PID.toBytes(), (byte) => byte.toString(16).padStart(2, "0")).join("");
 const POLL_MS = 1_000;
+/** Feed hints may bring a poll forward, but never closer than this to the previous one. */
+const MIN_POLL_SPACING_MS = 300;
+const AIRDROP_LAMPORTS = LAMPORTS_PER_SOL;
+const FAUCET_URL = "https://faucet.solana.com";
 const STALE_AFTER_MS = 5_000;
 const RECENT_ROUNDS = 12;
 /** Spec v2 §6 UI defaults. */
@@ -71,7 +89,8 @@ interface ChainState {
   walletLamports: bigint | null;
   sessionLamports: bigint | null;
   slot: bigint | null;
-  observedAt: number;
+  /** Measured slot duration, rounded to whole ms so it only re-renders on real changes. */
+  msPerSlot: number;
   lastSuccessAt: number;
   failed: boolean;
   /** Failing for longer than STALE_AFTER_MS. */
@@ -86,14 +105,27 @@ const INITIAL: ChainState = {
   walletLamports: null,
   sessionLamports: null,
   slot: null,
-  observedAt: 0,
+  msPerSlot: 400,
   lastSuccessAt: 0,
   failed: false,
   stale: false,
 };
 
+export type RevealHint = { roundId: bigint; seedHex: string };
+
+type RunResult = { ok: true } | { ok: false; reason: string };
+
 export function useSolanaCrash() {
   const { connection } = useConnection();
+  // Polls fail fast on 429 instead of web3.js retrying for up to 7.5 s: a late answer is useless
+  // for a live view, and the next poll comes in a second anyway (spec §5.1).
+  const pollConnection = useMemo(
+    () => new Connection(connection.rpcEndpoint, { commitment: "confirmed", disableRetryOnRateLimit: true }),
+    [connection],
+  );
+  const [clock] = useState(() => new SlotClock());
+  const [liveFeed, setLiveFeed] = useState<FeedStatus>(LIVE_FEED_URL ? "connecting" : "off");
+  const [revealHint, setRevealHint] = useState<RevealHint | null>(null);
   const wallet = useWallet();
   const owner = wallet.connected ? wallet.publicKey : null;
   const ownerKey = owner?.toBase58() ?? null;
@@ -122,6 +154,34 @@ export function useSolanaCrash() {
   }, [state]);
   const pollNow = useRef<() => void>(() => undefined);
 
+  // Baseline slot duration from the cluster; polls refine it (spec §5.1).
+  useEffect(() => {
+    let cancelled = false;
+    pollConnection
+      .getRecentPerformanceSamples(10)
+      .then((samples) => {
+        const measured = msPerSlotFromSamples(samples);
+        if (!cancelled && measured !== null) clock.setBaseline(measured);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [clock, pollConnection]);
+
+  // The crank's live channel, when configured: phase hints bring polls forward; seeds are kept
+  // as hints for the UI to verify (ADR 0004). Nothing from it is trusted as state.
+  useEffect(() => {
+    if (!LIVE_FEED_URL) return;
+    return connectOperatorFeed(LIVE_FEED_URL, {
+      onStatus: setLiveFeed,
+      onMessage: (message) => {
+        if (message.type === "crashed") setRevealHint({ roundId: message.roundId, seedHex: message.seedHex });
+        pollNow.current();
+      },
+    });
+  }, []);
+
   // This device's session key for the connected wallet, reloaded when the wallet changes
   // (adjusting state during render, so no stale key is ever used for another wallet).
   if (local.owner !== ownerKey) {
@@ -140,32 +200,51 @@ export function useSolanaCrash() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let roundId: bigint | null = stateRef.current.config ? stateRef.current.config.nextRoundId - 1n : null;
+    let inFlight = false;
+    let lastStartedAt = 0;
+    let phaseKey = "";
+    /** Consecutive 429 answers; while non-zero, polls back off instead of deepening the throttle. */
+    let rateLimited = 0;
 
     async function poll() {
       clearTimeout(timer);
+      if (inFlight) return;
+      inFlight = true;
+      lastStartedAt = performance.now();
       try {
         const keys: PublicKey[] = [houseConfigAddress(PID)];
         const roundIndex = roundId !== null && roundId >= 0n ? keys.push(roundAddress(PID, roundId)) - 1 : -1;
         const playerIndex = owner ? keys.push(playerAddress(PID, owner)) - 1 : -1;
         const walletIndex = owner ? keys.push(owner) - 1 : -1;
         const sessionIndex = sessionKey ? keys.push(sessionKey.publicKey) - 1 : -1;
-        const { context, value } = await connection.getMultipleAccountsInfoAndContext(keys, "confirmed");
+        const sentAt = performance.now();
+        const { context, value } = await pollConnection.getMultipleAccountsInfoAndContext(keys, "confirmed");
+        const receivedAt = performance.now();
         if (cancelled) return;
+        rateLimited = 0;
         if (!value[0]) throw new Error("house config not found");
         const config = decodeHouseConfig(value[0], PID);
         const newest = config.nextRoundId > 0n ? config.nextRoundId - 1n : null;
         const lamports = (index: number) => (index < 0 ? null : BigInt(value[index]?.lamports ?? 0));
-        const now = Date.now();
+        const round = roundIndex >= 0 && value[roundIndex] ? decodeRound(value[roundIndex]!, PID) : null;
+        // The answer reflects the cluster somewhere during the request: date it at the midpoint.
+        clock.observe(context.slot, (sentAt + receivedAt) / 2);
+        const nextPhaseKey = round ? `${round.roundId}:${round.phase}` : "";
+        if (nextPhaseKey !== phaseKey) {
+          // A phase change may jump the projection; within a phase it only changes speed.
+          phaseKey = nextPhaseKey;
+          clock.resync();
+        }
         setState({
           owner: ownerKey,
           config,
-          round: roundIndex >= 0 && value[roundIndex] ? decodeRound(value[roundIndex]!, PID) : null,
+          round,
           player: playerIndex < 0 ? undefined : value[playerIndex] ? decodePlayer(value[playerIndex]!, PID) : null,
           walletLamports: lamports(walletIndex),
           sessionLamports: lamports(sessionIndex),
           slot: BigInt(context.slot),
-          observedAt: now,
-          lastSuccessAt: now,
+          msPerSlot: Math.round(clock.msPerSlot()),
+          lastSuccessAt: Date.now(),
           failed: false,
           stale: false,
         });
@@ -175,7 +254,8 @@ export function useSolanaCrash() {
           timer = setTimeout(poll, 0);
           return;
         }
-      } catch {
+      } catch (error) {
+        rateLimited = classifyRpcError(error) === "rate-limited" ? rateLimited + 1 : 0;
         if (!cancelled) {
           setState((previous) => ({
             ...previous,
@@ -183,18 +263,33 @@ export function useSolanaCrash() {
             stale: Date.now() - previous.lastSuccessAt > STALE_AFTER_MS,
           }));
         }
+      } finally {
+        inFlight = false;
       }
-      if (!cancelled) timer = setTimeout(poll, POLL_MS);
+      const backoffMs = rateLimitBackoffMs(rateLimited);
+      if (!cancelled) timer = setTimeout(poll, backoffMs > 0 ? backoffMs : requested ? MIN_POLL_SPACING_MS : POLL_MS);
+      requested = false;
     }
 
-    pollNow.current = () => void poll();
+    let requested = false;
+    // Brings the next poll forward (after a transaction or a feed hint), spaced ≥ 300 ms.
+    pollNow.current = () => {
+      // While throttled, an early poll would only extend the penalty: keep the backoff delay.
+      if (cancelled || rateLimited > 0) return;
+      if (inFlight) {
+        requested = true;
+        return;
+      }
+      clearTimeout(timer);
+      timer = setTimeout(poll, Math.max(0, MIN_POLL_SPACING_MS - (performance.now() - lastStartedAt)));
+    };
     void poll();
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- owner is tracked through ownerKey
-  }, [connection, ownerKey, sessionKey]);
+  }, [clock, pollConnection, ownerKey, sessionKey]);
 
   // Recent rounds, refreshed whenever a round changes phase or a new one opens.
   const newestId = state.config ? state.config.nextRoundId - 1n : null;
@@ -215,20 +310,22 @@ export function useSolanaCrash() {
     };
   }, [connection, newestId, newestPhase]);
 
+  /** Continuous, monotonic projection of the slot (presentation; spec §5.1). */
+  const projectedTick = useCallback((): number | null => clock.project(performance.now()), [clock]);
   const estimatedTick = useCallback((): bigint | null => {
-    const { slot, observedAt } = stateRef.current;
-    if (slot === null) return null;
-    return slot + BigInt(Math.floor((Date.now() - observedAt) / (APPROX_SECONDS_PER_SLOT * 1000)));
-  }, []);
+    const tick = projectedTick();
+    return tick === null ? null : BigInt(Math.floor(tick));
+  }, [projectedTick]);
+  const msPerTick = useCallback(() => clock.msPerSlot(), [clock]);
 
   // ---- Transactions ----
 
-  const run = useCallback(
+  const runWithResult = useCallback(
     async (
       label: string,
       build: () => Promise<{ instructions: TransactionInstruction[]; payer: "wallet" | "session"; signers: Keypair[] }>,
       after?: () => void,
-    ) => {
+    ): Promise<RunResult> => {
       try {
         setAction({ status: "pending", label, step: "signing" });
         const { instructions, payer, signers } = await build();
@@ -246,13 +343,23 @@ export function useSolanaCrash() {
         const signature = await sendSigned(connection, signed, lastValidBlockHeight);
         after?.();
         setAction({ status: "confirmed", label, signature });
+        return { ok: true };
       } catch (error) {
-        setAction({ status: "rejected", label, reason: failureReason(error) });
+        const reason = failureReason(error);
+        setAction({ status: "rejected", label, reason });
+        return { ok: false, reason };
       } finally {
         pollNow.current();
       }
     },
     [connection, owner, wallet],
+  );
+  /** Port actions resolve to nothing: their outcome is reported through `action`. */
+  const run = useCallback(
+    async (...args: Parameters<typeof runWithResult>): Promise<void> => {
+      await runWithResult(...args);
+    },
+    [runWithResult],
   );
 
   const requireOwner = useCallback(() => {
@@ -288,7 +395,13 @@ export function useSolanaCrash() {
 
   const player = state.owner === ownerKey ? state.player : undefined;
   const walletLamports = state.owner === ownerKey ? state.walletLamports : null;
-  const session = sessionView(player ?? null, sessionKey?.publicKey ?? null, state.slot, state.sessionLamports);
+  const session = sessionView(
+    player ?? null,
+    sessionKey?.publicKey ?? null,
+    state.slot,
+    state.sessionLamports,
+    state.msPerSlot,
+  );
 
   const register = useCallback(
     (username: string, coins: bigint) =>
@@ -406,19 +519,27 @@ export function useSolanaCrash() {
   }, [connection, currentPlayer, recent]);
 
   const placeBet = useCallback(
-    (stake: bigint, autoCashOut: bigint) =>
-      run("Place bet", async () => {
-        const me = requireOwner();
-        const round = stateRef.current.round;
-        if (!sessionKey) throw new Error("no session on this device");
-        if (!round || round.phase !== "Betting") throw new Error("no round is taking bets");
-        const instructions: TransactionInstruction[] = [];
-        const bet = currentPlayer()?.activeBet;
-        if (bet && (await activeBetFinished())) instructions.push(settleBetIx(PID, me, bet.roundId));
-        instructions.push(placeBetIx(PID, me, sessionKey.publicKey, { roundId: round.roundId, stake, autoCashOut }));
-        return { instructions, payer: "session", signers: [sessionKey] };
-      }),
-    [activeBetFinished, currentPlayer, requireOwner, run, sessionKey],
+    async (stake: bigint, autoCashOut: bigint) => {
+      let settledPrevious = false;
+      const attempt = (allowSettle: boolean) =>
+        runWithResult("Place bet", async () => {
+          const me = requireOwner();
+          const round = stateRef.current.round;
+          if (!sessionKey) throw new Error("no session on this device");
+          if (!round || round.phase !== "Betting") throw new Error("no round is taking bets");
+          const instructions: TransactionInstruction[] = [];
+          const bet = currentPlayer()?.activeBet;
+          settledPrevious = allowSettle && Boolean(bet) && (await activeBetFinished());
+          if (settledPrevious) instructions.push(settleBetIx(PID, me, bet!.roundId));
+          instructions.push(placeBetIx(PID, me, sessionKey.publicKey, { roundId: round.roundId, stake, autoCashOut }));
+          return { instructions, payer: "session", signers: [sessionKey] };
+        });
+      const result = await attempt(true);
+      // The crank settles during the betting window too; if it won the race, the bundled
+      // settlement fails with NoActiveBet and nothing was applied: retry once without it (§6.2).
+      if (!result.ok && settledPrevious && result.reason === "NoActiveBet") await attempt(false);
+    },
+    [activeBetFinished, currentPlayer, requireOwner, runWithResult, sessionKey],
   );
 
   const cashOut = useCallback(
@@ -448,6 +569,22 @@ export function useSolanaCrash() {
     [currentPlayer, requireOwner, run, sessionKey],
   );
 
+  /** Devnet only: best-effort airdrop from the RPC faucet, which rate-limits heavily (§6.2). */
+  const requestAirdrop = useCallback(async () => {
+    setAction({ status: "pending", label: "Airdrop 1 SOL", step: "confirming" });
+    try {
+      const me = requireOwner();
+      const { lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+      const signature = await connection.requestAirdrop(me, AIRDROP_LAMPORTS);
+      await confirmSignature(connection, signature, lastValidBlockHeight);
+      setAction({ status: "confirmed", label: "Airdrop 1 SOL", signature });
+    } catch (error) {
+      setAction({ status: "rejected", label: "Airdrop 1 SOL", reason: airdropFailureReason(error) });
+    } finally {
+      pollNow.current();
+    }
+  }, [connection, requireOwner]);
+
   const connectionStatus: "connecting" | "live" | "stale" =
     state.lastSuccessAt === 0 ? "connecting" : state.stale ? "stale" : "live";
   const walletStatus: "disconnected" | "connecting" | "connected" = wallet.connecting
@@ -463,6 +600,11 @@ export function useSolanaCrash() {
       limits: state.config?.limits ?? null,
       round: state.round ? toLiveRound(state.round) : null,
       estimatedTick,
+      projectedTick,
+      msPerTick,
+      revealHint,
+      liveFeed,
+      programIdHex: PROGRAM_ID_HEX,
       myBet: player?.activeBet ?? null,
       playerBlocker: playerBlocker(owner !== null, player, session.status),
       balance: player?.balance ?? null,
@@ -473,7 +615,7 @@ export function useSolanaCrash() {
       cashOut,
       settle,
     }),
-    [action, cashOut, connectionStatus, estimatedTick, owner, placeBet, player, recent, session.status, settle, state.config, state.round],
+    [action, cashOut, connectionStatus, estimatedTick, liveFeed, msPerTick, owner, placeBet, player, projectedTick, recent, revealHint, session.status, settle, state.config, state.round],
   );
 
   const account = useMemo(
@@ -503,10 +645,11 @@ export function useSolanaCrash() {
       renewSession,
       revokeSession,
       exit,
+      testFunds: { faucetUrl: FAUCET_URL, request: requestAirdrop },
     }),
     // `session` is rebuilt every render; its fields are what matter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [accountRent, action, buy, checkUsername, exit, owner, ownerKey, player, register, renewSession, revokeSession, session.status, session.spent, session.spendCap, session.expiresInSeconds, state.failed, walletLamports, walletStatus],
+    [accountRent, action, buy, checkUsername, exit, owner, ownerKey, player, register, renewSession, requestAirdrop, revokeSession, session.status, session.spent, session.spendCap, session.expiresInSeconds, state.failed, walletLamports, walletStatus],
   );
 
   return { game, account };

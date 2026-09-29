@@ -6,8 +6,10 @@ import {
   PublicKey,
   SendTransactionError,
   Transaction,
+  type SendOptions as SendOptionsWeb3,
   type TransactionInstruction,
 } from "@solana/web3.js";
+import { msPerSlotFromSamples } from "@/chain-adapters/solana/network/slot-clock";
 import {
   PLAYER_ACTIVE_BET_TAG_OFFSET,
   decodeHouseConfig,
@@ -17,7 +19,7 @@ import {
   type RoundAccount,
 } from "@/chain-adapters/solana/crash-program/accounts";
 import { describeProgramError } from "@/chain-adapters/solana/crash-program/errors";
-import { failureReason, sendSigned } from "@/chain-adapters/solana/crash-program/send";
+import { confirmSignature, failureReason } from "@/chain-adapters/solana/crash-program/send";
 import { idlAccountDiscriminator } from "@/chain-adapters/solana/crash-program/idl";
 import { houseConfigAddress, roundAddress } from "@/chain-adapters/solana/crash-program/pdas";
 import {
@@ -133,7 +135,26 @@ export class OperatorChain {
     return parseOracle(info);
   }
 
-  async send(instructions: TransactionInstruction[]): Promise<SendResult> {
+  async slot(): Promise<bigint> {
+    return BigInt(await this.connection.getSlot("confirmed"));
+  }
+
+  /** Average slot duration reported by the cluster, or null if unavailable. */
+  async measuredMsPerSlot(): Promise<number | null> {
+    try {
+      return msPerSlotFromSamples(await this.connection.getRecentPerformanceSamples(10));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Signs, submits and confirms. Submission always runs the RPC's preflight simulation against the
+   * `confirmed` bank (never `skipPreflight`); `onSubmitted` runs only once the transaction passed
+   * it, before confirmation. The crank publishes a round's seed from there (ADR 0004), so a reveal
+   * that would fail (e.g. sent before the crash tick) never leaks it.
+   */
+  async send(instructions: TransactionInstruction[], options: SendOptions = {}): Promise<SendResult> {
     try {
       const { blockhash, lastValidBlockHeight } = await this.connection.getLatestBlockhash("confirmed");
       const transaction = new Transaction({ feePayer: this.operator.publicKey, blockhash, lastValidBlockHeight });
@@ -142,13 +163,40 @@ export class OperatorChain {
       }
       transaction.add(...instructions);
       transaction.sign(this.operator);
+      assertPreflight(SUBMIT_OPTIONS);
+      const signature = await this.connection.sendRawTransaction(transaction.serialize(), SUBMIT_OPTIONS);
+      try {
+        options.onSubmitted?.(signature);
+      } catch {
+        // Presentation hooks never affect the transaction.
+      }
       // Polling confirmation (no WebSocket): public RPCs rate-limit subscriptions, and web3.js
       // `confirmTransaction` can leak rejections from its background requests.
-      const signature = await sendSigned(this.connection, transaction, lastValidBlockHeight);
+      await confirmSignature(this.connection, signature, lastValidBlockHeight, CONFIRM_POLL_MS);
       return { ok: true, signature };
     } catch (error) {
       const logs = error instanceof SendTransactionError ? error.logs : undefined;
       return { ok: false, error: failureReason(error), programError: describeProgramError(error, logs) };
     }
+  }
+}
+
+export interface SendOptions {
+  /** Runs after the transaction passed preflight and the RPC accepted it, before confirmation. */
+  onSubmitted?: (signature: string) => void;
+}
+
+/** Every crank transaction is simulated before it is sent; nothing may override this. */
+export const SUBMIT_OPTIONS: Readonly<SendOptionsWeb3> = Object.freeze({
+  skipPreflight: false,
+  preflightCommitment: "confirmed",
+  maxRetries: 5,
+});
+
+const CONFIRM_POLL_MS = 500;
+
+export function assertPreflight(options: Readonly<SendOptionsWeb3>): void {
+  if (options.skipPreflight !== false || options.preflightCommitment !== "confirmed") {
+    throw new Error("crank transactions must run preflight against the confirmed bank");
   }
 }

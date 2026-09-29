@@ -25,6 +25,16 @@ export function parseCoins(text: string): CoinParseResult {
   return { ok: true, baseUnits };
 }
 
+/** Base units per whole unit of the wallet's native asset (10⁹ lamports = 1 SOL = 1000 coins). */
+export const BASE_UNITS_PER_NATIVE = 1_000_000_000n;
+
+/** `1_234_567_891n → "1.2345"`: native-asset amount truncated to 4 decimals, for display only. */
+export function formatNative(baseUnits: bigint): string {
+  const whole = baseUnits / BASE_UNITS_PER_NATIVE;
+  const fraction = ((baseUnits % BASE_UNITS_PER_NATIVE) / 100_000n).toString().padStart(4, "0");
+  return `${whole}.${fraction}`;
+}
+
 /** `1_500_000n → "1.50"`: trailing zeros trimmed, keeping at least `minDecimals`. */
 export function formatCoins(baseUnits: bigint, minDecimals = 2): string {
   const negative = baseUnits < 0n;

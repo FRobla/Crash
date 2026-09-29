@@ -52,6 +52,8 @@ export interface PlayerAccountPort {
   revokeSession(): Promise<void>;
   /** Revokes the session, sells the whole balance and returns the session key's fee budget. */
   exit(): Promise<void>;
+  /** Test networks only: where to get free test funds, and a best-effort request for some. */
+  testFunds?: { faucetUrl: string; request(): Promise<void> };
 }
 
 const PlayerAccountContext = createContext<PlayerAccountPort | null>(null);

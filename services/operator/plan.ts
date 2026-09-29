@@ -27,6 +27,26 @@ export interface CrankState {
   crashTick: bigint | null;
 }
 
+/**
+ * The program accepts `reveal` once `slot − start_slot ≥ crash_tick`. With `slot` read at
+ * `confirmed`, any transaction sent afterwards lands in a later slot, so a reveal (and the seed the
+ * live feed publishes with it) can never precede the crash tick.
+ */
+export function revealReady(round: Pick<RoundAccount, "startSlot">, crashTick: bigint, slot: bigint): boolean {
+  return slot >= round.startSlot + crashTick;
+}
+
+/** Slots kept free before the betting window closes, so settlements never delay `close_betting`. */
+export const SETTLE_MARGIN_SLOTS = 8n;
+
+/**
+ * Settlements of finished rounds run during the next round's betting window (spec
+ * crash-client-v1 §4.2): the round opens first, so players never wait for them.
+ */
+export function settleWindowOpen(round: Pick<RoundAccount, "phase" | "bettingEndSlot"> | null, slot: bigint): boolean {
+  return round !== null && round.phase === "Betting" && slot + SETTLE_MARGIN_SLOTS < round.bettingEndSlot;
+}
+
 export function planNextAction({ config, round, slot, hasSeed, crashTick }: CrankState): CrankAction {
   if (config.currentRound === null) {
     if (config.paused) return { kind: "wait", untilSlot: null, reason: "house paused" };
@@ -58,8 +78,9 @@ export function planNextAction({ config, round, slot, hasSeed, crashTick }: Cran
       if (!hasSeed || crashTick === null) {
         return { kind: "wait", untilSlot: round.revealDeadlineSlot + 1n, reason: "no seed: waiting to forfeit" };
       }
-      const revealSlot = round.startSlot + crashTick;
-      if (slot < revealSlot) return { kind: "wait", untilSlot: revealSlot, reason: "running" };
+      if (!revealReady(round, crashTick, slot)) {
+        return { kind: "wait", untilSlot: round.startSlot + crashTick, reason: "running" };
+      }
       return { kind: "reveal", roundId };
     }
     default:

@@ -10,7 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Next.js 16 tiene cambios incompatibles con versiones anteriores: antes de escribir código de Next, consulta la guía relevante en `node_modules/next/dist/docs/`.
 - Gestor de paquetes: **pnpm** (versión fijada en `packageManager`). No uses npm ni yarn ni generes otros lockfiles. `pnpm-workspace.yaml` (`allowBuilds`) controla qué dependencias pueden ejecutar scripts de instalación; revisa cada paquete antes de permitirlo.
 - Red objetivo: **Solana devnet**. El cluster es la constante `SOLANA_CLUSTER` en `src/chain-adapters/solana/config.ts`, no una variable de entorno; pasar a mainnet exige un cambio de código deliberado con revisión legal, de riesgo y de seguridad. La UI comprueba el genesis hash del RPC y marca `wrong network` si no es devnet.
-- Configuración pública: `.env.example` (copiar a `.env.local`). Las variables `NEXT_PUBLIC_*` se incrustan en el bundle del navegador: nunca pongas secretos en ellas.
+- Configuración pública: `.env.example` (copiar a `.env.local`). Las variables `NEXT_PUBLIC_*` se incrustan en el bundle del navegador: nunca pongas secretos en ellas. `NEXT_PUBLIC_CRASH_LIVE_FEED_URL` (opcional, `http://127.0.0.1:8787/events` en local) conecta la web al canal en vivo del crank (ADR 0004, solo presentación), que `pnpm operator` sirve en `127.0.0.1` (`CRASH_OPERATOR_LIVE_PORT`/`CRASH_OPERATOR_LIVE_ORIGIN`).
+- La duración real de un slot en devnet es ≈ 230 ms, no 400: cuentas atrás, ejes y caducidades usan el reloj medido (`chain-adapters/solana/network/slot-clock.ts`), nunca una constante nominal.
 
 | Tarea | Comando |
 | --- | --- |
@@ -22,6 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Un archivo o una prueba concreta | `pnpm vitest run src/games/crash/ui/BetPanel.test.tsx -t "disables placing"` |
 | Crank del operador (compila y ejecuta; lee `.env.operator`, plantilla en `services/operator/operator.env.example`) | `pnpm operator` |
 | Jugador end-to-end en devnet contra el crank en marcha (fondea desde el keypair del operador y lo devuelve) | `pnpm operator:e2e` |
+| Cambiar la ventana de apuestas de la casa (admin; segundos → slots con la duración medida; solo toca `betting_slots`) | `pnpm operator:config -- --betting-seconds 15` |
 | Auditoría de dependencias | `pnpm audit` |
 | Regenerar vectores de referencia tras un cambio **deliberado** de reglas | `pnpm vitest run reference-vectors -u` |
 
@@ -66,10 +68,10 @@ src/
   games/crash/domain/   # Motor puro de Crash: curva, crash point, límites, liquidación, ciclo de vida
   games/crash/fairness/ # Verificador del esquema C (commit, entropía, crash point) sobre bytes
   games/crash/ui/       # Puerto de la partida en vivo (crash-game.ts), vistas y lógica de presentación pura
-  chain-adapters/solana/  # Config devnet, salud del RPC, wallet adapter
-    crash-program/      # Codec desde el IDL versionado, PDAs, eventos, errores y hooks que implementan los puertos
+  chain-adapters/solana/  # Config devnet, salud del RPC y reloj de slots medido, wallet adapter (autoConnect, errores visibles)
+    crash-program/      # Codec desde el IDL versionado, PDAs, eventos, errores, cliente del canal en vivo y hooks que implementan los puertos
     switchboard/        # Switchboard off-chain sin SDK: cola, oráculos, gateway del reveal
-services/operator/      # Crank del operador (Node, fuera del bundle web) y jugador E2E de devnet
+services/operator/      # Crank del operador (Node, fuera del bundle web) con canal SSE local, script de admin y jugador E2E de devnet
 programs/solana/        # Workspace Anchor (Rust); fuera de src/ y del toolchain JS
   crates/crash-rules/   # Reglas puras en Rust (no_std, sin Anchor); reproducen los vectores de TS exactamente
   programs/crash/       # Programa on-chain: cuentas de jugador (saldo, sesiones, nombre, experiencia), apuestas, cash-outs y liquidación (tests LiteSVM)
@@ -89,7 +91,7 @@ Límites de dependencias:
 - `games/*` y `platform/*` no importan de `chain-adapters/*`. La composición ocurre en `src/app` (p. ej., `app/(dashboard)/layout.tsx` inyecta los componentes de Solana en los slots del shell, y `crash-runtime.tsx` conecta el adaptador Solana a los puertos `CrashGamePort` y `PlayerAccountPort`).
 - `chain-adapters/*` tampoco importa de `games/*`: devuelve vistas estructuralmente compatibles con los puertos y `src/app` las tipa contra ellos. `services/operator/` sí usa `games/crash/domain` y `fairness` (reglas y verificación compartidas) y nunca se importa desde `src/`.
 - `chain-adapters/*` puede depender de puertos y UI de `platform/*`, nunca al revés.
-- Las reglas de Crash ya viven en `src/games/crash/domain/`. La autoridad de settlement es un programa Anchor (ADR 0001, aceptado) especificado en `docs/specs/crash-program-v2.md` sobre `crash-program.md` v1.1; el cliente web y el crank, en `docs/specs/crash-client-v1.md` (IDL versionado en `chain-adapters/solana/crash-program/idl/crash.json`: regenerarlo solo si cambia el programa); randomness usa el esquema C de ADR 0002 (aceptado) con Switchboard On-Demand y una PDA del programa como authority. El program id de Switchboard está fijado al de devnet en `switchboard.rs`. ADR 0003 (aceptado) define saldo de jugador on-chain en una PDA `Player`, monedas (1 moneda = 10⁶ lamports), claves de sesión, nombre de usuario y experiencia on-chain; su diseño está en `docs/specs/crash-program-v2.md` (aprobada, implementada y desplegada en devnet). La moneda es solo presentación: el programa y el motor trabajan en lamports. No crees carpetas vacías por adelantado.
+- Las reglas de Crash ya viven en `src/games/crash/domain/`. La autoridad de settlement es un programa Anchor (ADR 0001, aceptado) especificado en `docs/specs/crash-program-v2.md` sobre `crash-program.md` v1.1; el cliente web y el crank, en `docs/specs/crash-client-v1.md` (IDL versionado en `chain-adapters/solana/crash-program/idl/crash.json`: regenerarlo solo si cambia el programa); randomness usa el esquema C de ADR 0002 (aceptado) con Switchboard On-Demand y una PDA del programa como authority. El program id de Switchboard está fijado al de devnet en `switchboard.rs`. ADR 0003 (aceptado) define saldo de jugador on-chain en una PDA `Player`, monedas (1 moneda = 10⁶ lamports), claves de sesión, nombre de usuario y experiencia on-chain; su diseño está en `docs/specs/crash-program-v2.md` (aprobada, implementada y desplegada en devnet). La moneda es solo presentación: el programa y el motor trabajan en lamports. ADR 0004 (propuesto) define el canal en vivo del crank: solo presentación, semilla publicada únicamente tras el preflight del `reveal` y verificada en la web contra el commit on-chain. No crees carpetas vacías por adelantado.
 
 ## Producto
 

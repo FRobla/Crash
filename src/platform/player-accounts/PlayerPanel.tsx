@@ -8,7 +8,7 @@ import { StatusItem } from "@/platform/shell/StatusItem";
 import { ActionStatus } from "@/platform/transactions/ActionStatus";
 import { isBusy } from "@/platform/transactions/action-state";
 import { shortenAddress } from "@/platform/wallets/wallet-session";
-import { formatCoins, parseCoins } from "./coins";
+import { BASE_UNITS_PER_COIN, formatCoins, formatNative, parseCoins } from "./coins";
 import { isValidUsername, usePlayerAccount, type PlayerSessionView } from "./player-account";
 
 const INPUT_CLASS =
@@ -56,9 +56,8 @@ export function PlayerPanel() {
       meta={account.address ? <StatusItem label="wallet" value={shortenAddress(account.address)} /> : undefined}
     >
       <div className="flex flex-col gap-4 p-4">
-        {account.wallet !== "connected" && (
-          <p className="text-sm text-muted">Connect a devnet wallet to create an account and play.</p>
-        )}
+        {account.wallet !== "connected" && <DevnetGuide faucetUrl={account.testFunds?.faucetUrl ?? null} />}
+        {account.wallet === "connected" && account.status !== "loading" && <WalletFunds />}
         {account.wallet === "connected" && account.status === "loading" && <SkeletonLines />}
         {account.wallet === "connected" && account.status === "error" && (
           <p className="text-sm text-danger">Could not load the account from the RPC. Retrying…</p>
@@ -68,6 +67,89 @@ export function PlayerPanel() {
         <ActionStatus action={account.action} explorerUrl={account.explorerUrl} />
       </div>
     </Panel>
+  );
+}
+
+const WALLETS = [
+  { name: "Phantom", url: "https://phantom.app/download" },
+  { name: "Solflare", url: "https://solflare.com/download" },
+  { name: "Backpack", url: "https://backpack.app/downloads" },
+] as const;
+
+const LINK_CLASS = "text-accent underline hover:no-underline";
+
+/** First steps on devnet, before a wallet is connected (spec crash-client-v1 §6.2). */
+function DevnetGuide({ faucetUrl }: { faucetUrl: string | null }) {
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <p className="text-muted">Play with free devnet SOL: no real money is involved.</p>
+      <ol className="flex list-decimal flex-col gap-1.5 pl-5 text-xs text-muted marker:text-accent">
+        <li>
+          Install a Solana wallet:{" "}
+          {WALLETS.map((wallet, index) => (
+            <span key={wallet.name}>
+              {index > 0 && ", "}
+              <a className={LINK_CLASS} href={wallet.url} target="_blank" rel="noopener noreferrer">
+                {wallet.name}
+              </a>
+            </span>
+          ))}
+          .
+        </li>
+        <li>
+          In the wallet settings, turn on <span className="text-fg">Devnet / Testnet mode</span> and pick Solana Devnet.
+        </li>
+        <li>
+          Get free devnet SOL
+          {faucetUrl ? (
+            <>
+              {" "}
+              at{" "}
+              <a className={LINK_CLASS} href={faucetUrl} target="_blank" rel="noopener noreferrer">
+                {new URL(faucetUrl).host}
+              </a>
+            </>
+          ) : null}{" "}
+          (paste your wallet address).
+        </li>
+        <li>
+          <span className="text-fg">Connect wallet</span> (top right), then create your account here.
+        </li>
+      </ol>
+    </div>
+  );
+}
+
+/** The wallet's own balance, the coin rate and, when short, where to get test funds. */
+function WalletFunds() {
+  const account = usePlayerAccount();
+  const busy = isBusy(account.action);
+  const lamports = account.walletBalance;
+  // Enough for the one-off registration (or one coin once registered) plus fees.
+  const needed = (account.status === "registered" ? 0n : account.registrationOverhead) + BASE_UNITS_PER_COIN;
+  const low = lamports !== null && lamports < needed;
+  return (
+    <section aria-label="Wallet funds" className="flex flex-col gap-2 rounded-md border border-border px-3 py-2 text-xs">
+      <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="text-muted">wallet</span>
+        <span className="tabular-nums">
+          <span className="text-fg">{lamports === null ? "—" : formatNative(lamports)} SOL</span>
+          {lamports !== null && <span className="text-muted"> ≈ {formatCoins(lamports, 0)} coins</span>}
+        </span>
+      </p>
+      <p className="text-muted">1 coin = 0.001 SOL · 1 SOL = 1000 coins · coins sell back at the same rate</p>
+      {low && account.testFunds && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+          <span className="text-warn">Low on devnet SOL.</span>
+          <a className={LINK_CLASS} href={account.testFunds.faucetUrl} target="_blank" rel="noopener noreferrer">
+            Open the faucet
+          </a>
+          <button type="button" className={SECONDARY_CLASS} disabled={busy} onClick={() => void account.testFunds?.request()}>
+            Airdrop 1 SOL
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -190,7 +272,10 @@ function AccountSummary() {
           <dd className="truncate">{account.username ?? "(no name)"}</dd>
           <dt className="text-[11px] uppercase tracking-widest text-muted">balance</dt>
           <dd className="text-lg font-semibold tabular-nums">
-            {account.balance === null ? "—" : `${formatCoins(account.balance)} coins`}
+            <span>{account.balance === null ? "—" : `${formatCoins(account.balance)} coins`}</span>
+            {account.balance !== null && (
+              <span className="ml-2 text-xs font-normal text-muted">≈ {formatNative(account.balance)} SOL</span>
+            )}
           </dd>
         </dl>
       </div>

@@ -36,9 +36,26 @@ function renderPanel(port: PlayerAccountPort) {
 }
 
 describe("PlayerPanel", () => {
-  it("asks for a wallet first", () => {
-    renderPanel(account({ wallet: "disconnected", address: null }));
-    expect(screen.getByText(/Connect a devnet wallet/)).toBeInTheDocument();
+  it("guides a new player through devnet before a wallet is connected", () => {
+    renderPanel(account({ wallet: "disconnected", address: null, testFunds: { faucetUrl: "https://faucet.solana.com", request: vi.fn() } }));
+    expect(screen.getByRole("link", { name: "Phantom" })).toHaveAttribute("href", "https://phantom.app/download");
+    expect(screen.getByText(/Devnet \/ Testnet mode/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "faucet.solana.com" })).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("shows the wallet's SOL and offers test funds when it cannot afford an account", async () => {
+    const request = vi.fn(async () => undefined);
+    renderPanel(account({ walletBalance: 5_000_000n, testFunds: { faucetUrl: "https://faucet.solana.com", request } }));
+    expect(screen.getByText("0.0050 SOL")).toBeInTheDocument();
+    expect(screen.getByText(/Low on devnet SOL/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Airdrop 1 SOL" }));
+    expect(request).toHaveBeenCalled();
+  });
+
+  it("does not nag a funded wallet", () => {
+    renderPanel(account({ testFunds: { faucetUrl: "https://faucet.solana.com", request: vi.fn() } }));
+    expect(screen.getByText("1.0000 SOL")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Airdrop 1 SOL" })).not.toBeInTheDocument();
   });
 
   it("registers with a lowercase name and the coins in base units", async () => {

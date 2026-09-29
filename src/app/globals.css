@@ -29,6 +29,59 @@
   --animate-live-dot: live-dot 2s ease-in-out infinite;
   --animate-glow: glow 1.6s ease-in-out infinite;
   --animate-indeterminate: indeterminate 1.4s ease-in-out infinite;
+  --animate-launch: launch 900ms ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 1s ease-in-out infinite;
+  --animate-fly-in: fly-in 700ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  --animate-celebrate: celebrate 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+  @keyframes launch {
+    0%,
+    100% {
+      transform: translateY(0) rotate(-45deg);
+    }
+    50% {
+      transform: translateY(-4px) rotate(-45deg);
+    }
+  }
+  @keyframes pulse-ring {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.06);
+    }
+  }
+  /* The newest crash chip drops into the recent-rounds bar from above, like the crash landing there. */
+  @keyframes fly-in {
+    from {
+      opacity: 0;
+      transform: translateY(-48px) scale(1.6);
+    }
+    60% {
+      opacity: 1;
+    }
+  }
+  @keyframes celebrate {
+    0% {
+      opacity: 0;
+      transform: translateY(8px) scale(0.9);
+    }
+    15% {
+      opacity: 1;
+      transform: translateY(0) scale(1.08);
+    }
+    25% {
+      transform: scale(1);
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-16px);
+    }
+  }
 
   @keyframes fade-in {
     from {

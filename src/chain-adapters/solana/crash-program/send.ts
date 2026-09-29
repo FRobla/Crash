@@ -37,7 +37,12 @@ export async function confirmSignature(
     try {
       status = (await connection.getSignatureStatuses([signature])).value[0];
       // A transaction already seen by the cluster cannot expire any more; only an unseen one can.
-      if (!status) expired = (await connection.getBlockHeight("confirmed")) > lastValidBlockHeight;
+      if (!status && (await connection.getBlockHeight("confirmed")) > lastValidBlockHeight) {
+        // The plain lookup only covers recent slots: after a long outage (e.g. a run of 429s) a
+        // landed transaction drops out of it. Search the history before calling it expired.
+        status = (await connection.getSignatureStatuses([signature], { searchTransactionHistory: true })).value[0];
+        expired = !status;
+      }
       rpcErrors = 0;
     } catch (error) {
       // Throttling or a dropped request says nothing about the transaction: keep polling.

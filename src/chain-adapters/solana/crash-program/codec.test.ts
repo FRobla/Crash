@@ -16,7 +16,15 @@ import { CRASH_PROGRAM_ID } from "./deployment";
 import { describeProgramError, programErrorName } from "./errors";
 import { betSettledEvents, decodeEvents } from "./events";
 import { CRASH_IDL, CRASH_IDL_PROGRAM_ID, CRASH_IDL_TYPES, definedType, idlAccountDiscriminator } from "./idl";
-import { buildInstruction, cashOutIx, placeBetIx, registerPlayerIx, revealIx, settleBetIx } from "./instructions";
+import {
+  buildInstruction,
+  cashOutIx,
+  placeBetIx,
+  registerPlayerIx,
+  revealIx,
+  settleBetIx,
+  updateConfigIx,
+} from "./instructions";
 import { houseConfigAddress, playerAddress, roundAddress } from "./pdas";
 import accounts from "./fixtures/devnet-accounts.json";
 import transactions from "./fixtures/round-3-transactions.json";
@@ -77,6 +85,37 @@ describe("instructions", () => {
     expect(ix.keys[0].pubkey.equals(session)).toBe(true);
     expect(ix.keys[3].pubkey.equals(roundAddress(PID, 3n))).toBe(true);
     expect(ix.keys[4].pubkey.equals(playerAddress(PID, owner))).toBe(true);
+  });
+
+  it("encodes update_config from the deployed config, changing only what the caller changes", () => {
+    const config = decodeHouseConfig(fixture(accounts.houseConfig), PID);
+    const timeouts = { ...config.timeouts, bettingSlots: 65n };
+    const ix = updateConfigIx(PID, config.admin, {
+      operator: config.operator,
+      limits: config.limits,
+      timeouts,
+      maxBetsPerRound: config.maxBetsPerRound,
+      paused: config.paused,
+      playerPolicy: config.playerPolicy,
+    });
+    const spec = CRASH_IDL.instructions.find((candidate) => candidate.name === "update_config")!;
+    expect([...ix.data.subarray(0, 8)]).toEqual(spec.discriminator);
+    expect(ix.keys.map((key) => [key.pubkey.toBase58(), key.isSigner, key.isWritable])).toEqual([
+      [config.admin.toBase58(), true, false],
+      [houseConfigAddress(PID).toBase58(), false, true],
+    ]);
+    const u32 = Buffer.alloc(4);
+    u32.writeUInt32LE(config.maxBetsPerRound);
+    const { minStake, maxStake, maxPayout, maxRoundExposure } = config.limits;
+    expect(hex(ix.data.subarray(8))).toBe(
+      hex(config.operator.toBytes()) +
+        [minStake, maxStake, maxPayout, maxRoundExposure].map(le64).join("") +
+        [65n, timeouts.entropyTimeoutSlots, timeouts.revealGraceSlots].map(le64).join("") +
+        u32.toString("hex") +
+        (config.paused ? "01" : "00") +
+        le64(config.playerPolicy.maxSessionSlots) +
+        le64(config.playerPolicy.usernameCooldownSlots),
+    );
   });
 
   it("encodes strings with a u32 length prefix", () => {

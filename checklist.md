@@ -1,5 +1,81 @@
 # Checklist
 
+## Iteración 9 — Jugabilidad en devnet: ventana de 15 s, wallet, crash sin sobrepaso y animación fluida
+
+Planificada e implementada el 2026-09-29. Problemas del usuario: no da tiempo a apostar; animación del crash y entre rondas poco fluida (debe ser adictiva y satisfactoria); el multiplicador sube más que el crash real (p. ej. x5 y luego crash en x3.5); no se puede conectar la wallet en devnet ni, por tanto, comprar monedas. Decisiones del usuario: **15 s de apuestas** (la espera de randomness va aparte), **canal en vivo del crank** contra el sobrepaso, extras **apostar a la siguiente ronda** y **sonidos (desactivados por defecto)**.
+
+### Diagnóstico (verificado al planificar)
+- **Wallet:** `SolanaWalletControl.tsx` solo abre el modal; el modal de `wallet-adapter-react-ui` solo hace `select()` (`WalletModal.tsx:54-58`) y con `autoConnect={false}` (`SolanaWalletProvider.tsx`) nadie llama a `connect()`. Sin `onError`. El alta/compra de `PlayerPanel` ya existe (1 moneda = 0.001 SOL) pero solo aparece conectado. No hay guía de devnet, faucet ni saldo SOL visible (`walletBalance` existe en el adaptador).
+- **Slots reales ≈ 230 ms** en devnet (medido con `getRecentPerformanceSamples`); el código asume 400 ms (`APPROX_SECONDS_PER_TICK` en `round-view.ts`, `APPROX_SECONDS_PER_SLOT` en `view-mapping.ts`): cuentas atrás, ejes y caducidad de sesión mal; `betting_slots = 13` son ≈ 3 s, no 5; la sesión de "24 h" dura ≈ 14 h.
+- **Sobrepaso:** `reveal` exige `slot − start_slot ≥ crash_tick` (correcto). El crank duerme 800 ms por paso (`plan.ts` devuelve `wait` y `main.ts` ignora `untilSlot`), lee el slot `confirmed` y envía con blockhash + preflight; la web sondea cada 1 s (`use-solana-crash.ts`, `POLL_MS`) y web3.js reintenta los 429 hasta 7.5 s. ≈ 3 s ≈ 14 ticks de retraso (2.4 %/tick). Un cash-out en ese intervalo se confirma on-chain pero pierde en `settle_bet`.
+- **Tirones:** `use-live-clock.ts` reinicia `fraction` en cada re-anclaje (también hacia atrás); todo `CrashConsole` se re-renderiza a 60 Hz; el número grande salta a pasos de 2.4 % y puede bajar; el anillo va a saltos de 1 s; cortes duros entre fases (curva aparece/desaparece, titular salta centro ↔ esquina); destello "idle" al cargar; el crank liquida apuestas **antes** de abrir la ronda siguiente (3–13 s extra).
+- **Config:** `betting_slots` se cambió con un cliente desechable; no hay builder `update_config` en `instructions.ts`. `update_config` sobrescribe toda la config (operator, limits, timeouts, max_bets_per_round, paused, player_policy).
+
+### 0. Specs primero (spec-first)
+- [x] ADR 0004 (propuesto): canal SSE del crank, solo presentación; la web verifica la semilla contra el commit on-chain; solo local (`127.0.0.1`; desplegar exige TLS/proxy por Local Network Access y contenido mixto); amenazas (entrada no confiable, DoS, forks)
+- [x] `crash-client-v1.md`: §4 crank (eventos del feed, abrir antes de liquidar, espera dirigida al slot del reveal), §5 vista en vivo (reloj medido, titular continuo solo presentación —se relaja "la fracción nunca alimenta un número mostrado"; oferta de cash-out y resultados siguen en ticks enteros—, crash provisional verificado, curva ≈ 1 slot por detrás), §6 cola de apuesta y reintento ante `NoActiveBet`, §10 amenazas, §11.5 ventana de 15 s
+- [x] `crash-program-v2.md` §6: nuevo `betting_slots`
+
+### 1. Fairness compartida
+- [x] `deriveOutcome(programId, roundId, rulesVersion, seed, vrfOutput)` → `{commitment, crashPoint, crashTick}` o `null` en `games/crash/fairness/verify-round.ts`; `verifyRound` y `services/operator/round-math.ts` la reutilizan
+- [x] Pruebas contra `fixtures/devnet-rounds.json` y rechazo de semilla/ronda/VRF ajenos
+
+### 2. Ventana de 15 s
+- [x] `updateConfigIx` desde el IDL versionado + prueba de codec
+- [x] Script admin `services/operator/admin-config.ts` (`pnpm operator:config -- --betting-seconds 15`): lee `HouseConfig`, exige keypair = `config.admin`, convierte segundos → slots con la tasa medida (≈ 65), cambia solo `betting_slots`, relee y verifica. Sin exigir ronda inactiva (cada ronda guarda su `bettingEndSlot`; el crank casi nunca deja hueco)
+- [x] Ejecutarlo en devnet y anotar la firma: `betting_slots` 13 → **66** (15 s a 231 ms/slot medidos), firma `597BRCJgFyHhqqL4juuLYunJVqdgN5BZvxL1q5KZXdpbqg1yDm6pc354N32oYwMiwCgv9pSbbJkfRveTrQYPZHyR`, verificado
+
+### 3. Crank (`services/operator/`)
+- [x] `chain.ts`: separar envío (con preflight) de confirmación; `reveal` **nunca** con `skipPreflight` (assert + prueba: un reveal prematuro fallido publicaría la semilla)
+- [x] `plan.ts`: predicado puro `revealReady` (pruebas en `start + crashTick − 1` y `start + crashTick`) y ventana de liquidación (`slot < bettingEndSlot − margen`)
+- [x] `main.ts`: abrir la ronda siguiente al terminar la anterior y liquidar durante las apuestas; dormir hasta la hora prevista del slot del crash y sondear `getSlot` cada ≈ 250 ms solo en los últimos ≈ 1.5 s (no más: 429); emitir `crashed {roundId, seedHex}` **solo tras pasar el preflight del `sendRawTransaction` del reveal**; pistas de fase `opened` / `betting-closed` / `started` / `revealed`
+- [x] `live-feed.ts`: SSE con `node:http` (sin dependencias), `127.0.0.1`, CORS de origen exacto, límite de conexiones, heartbeat, instantánea al conectar; `CRASH_OPERATOR_LIVE_PORT` / `CRASH_OPERATOR_LIVE_ORIGIN` en `config.ts` y `operator.env.example`
+- [x] Pruebas: `live-feed.test.ts` (CORS, límite, forma de eventos, ninguna semilla antes del preflight), casos nuevos en `plan.test.ts` y `operator.test.ts`
+
+### 4. Adaptador Solana (`src/chain-adapters/solana/`)
+- [x] `network/slot-clock.ts` puro: tasa inicial de `getRecentPerformanceSamples`, refinada por regresión sobre ≈ 15 s de sondeos, acotada a 150–600 ms; proyección continua y monótona que corrige variando la velocidad (0.5×–1.5×) y solo salta con error > ≈ 8 slots o cambio de fase; pruebas
+- [x] `crash-program/operator-feed.ts`: cliente SSE con validación (hex de 64, ronda actual) y backoff; `NEXT_PUBLIC_CRASH_LIVE_FEED_URL` validada con zod como en `config.ts` (http solo para localhost); sin feed → solo on-chain
+- [x] `use-solana-crash.ts`: `Connection` de sondeo con `disableRetryOnRateLimit: true`; pistas del feed → sondeo (≥ 300 ms entre ellos); expone `projectedTick()`, `msPerTick()`, `revealHint`, `liveFeed`, `programIdHex`; reintento único sin `settle` si la apuesta falla con `NoActiveBet` (carrera con el crank que liquida durante las apuestas); airdrop de devnet a mejor esfuerzo
+- [x] `view-mapping.ts`: `vrfOutputHex` en `LiveRound` (siempre de la cuenta confirmada); eliminar `APPROX_SECONDS_PER_SLOT`
+- [x] `wallet/SolanaWalletProvider.tsx`: `autoConnect` (conecta tras elegir y reconecta al recargar), `onError` mostrado en `SolanaWalletControl`, corregir el comentario obsoleto
+
+### 5. UI del juego (`src/games/crash/ui/`)
+- [x] `crash-game.ts`: campos nuevos del puerto; `estimatedTick() = floor(projectedTick())`
+- [x] `use-early-crash.ts`: verifica `revealHint` con `deriveOutcome` contra `commitHex` (memo por ronda); si la ronda acaba en forfeit, el crash provisional se sustituye
+- [x] `round-view.ts`: fase "crashed (verificado, reveal on-chain pendiente)"; cuenta atrás continua con `msPerTick`; sin oferta de cash-out desde el tick de crash verificado; resultado del auto (objetivo ≤ crash → gana, pendiente de liquidación); eliminar `APPROX_SECONDS_PER_TICK`
+- [x] Reloj de presentación: sustituir `use-live-clock.ts` por suscripción rAF en componentes hoja (curva y titular); curva ≈ 1 slot por detrás (buffer de jitter) que sube exactamente hasta el crash verificado (si llega tarde, baja al crash point); titular continuo con interpolación exponencial entre puntos
+- [x] `CrashConsole.tsx` / `CrashChart.tsx`: crash visible ≥ 2.5 s y fundido a la cuenta atrás; anillo continuo con decimales y pulso en los últimos 3 s; estado "launching" durante la randomness; skeleton en vez del destello "idle"; el chip del crash vuela a la barra de recientes
+- [x] `BetPanel.tsx`: celebración de la ganancia confirmada (+X monedas); **"Bet next round"** de un solo uso, en memoria, cancelable, revalida con `checkNewBet` al enviar, se borra si cambian wallet/sesión/saldo/límites, solo con sesión activa; acceso directo a comprar monedas si falta saldo
+- [x] `sound.ts`: sonidos WebAudio sintetizados (cuenta atrás, despegue, cash-out, crash), botón de silencio, **desactivados por defecto**, preferencia en `localStorage` con try/catch
+- [x] `prefers-reduced-motion`: sin número continuo, sin fundidos ni sacudidas, cuenta atrás en segundos enteros
+
+### 6. Cuenta (`src/platform/player-accounts/`)
+- [x] `PlayerPanel.tsx`: onboarding de devnet (instalar Phantom/Solflare/Backpack → activar Devnet/Testnet mode en la wallet → SOL de `faucet.solana.com` como vía principal + botón de airdrop con error claro), saldo SOL de la wallet y cambio monedas ↔ SOL
+- [x] Capacidad opcional `testFunds?` en `PlayerAccountPort` (sin que `platform` importe el adaptador)
+
+### 7. Verificación y seguridad
+- [x] Actualizar pruebas: `CrashConsole.test.tsx`, `BetPanel.test.tsx`, `PlayerPanel.test.tsx` (fakes del puerto, textos de cuenta atrás), `chart-geometry.test.ts` (tick continuo), `adapter.test.ts` (`vrfOutputHex`)
+- [x] Pruebas nuevas: `slot-clock`, `operator-feed`, `use-early-crash`, `deriveOutcome`, `live-feed`, `plan`, control de wallet (conecta tras elegir)
+- [x] `corepack pnpm test` (289), `lint`, `typecheck`, `build`, `audit` (2 moderadas conocidas). Rust sin cambios: ni programa ni layout
+- [ ] Devnet, **parcial**: crank con feed en las rondas 94–114 (reveladas = crank; el `crashed` de la ronda 96 llegó en el segundo en que aterrizó el `reveal`; reveal prematuro de la ronda 100 rechazado en preflight sin publicar la semilla). Pendiente: comprobación visual con `pnpm dev` (el navegador headless no arranca aquí), repetir sin feed y `pnpm operator:e2e`, que no pudo completarse por los 429 de la RPC pública (claves guardadas: el próximo arranque lo reanuda y devuelve los fondos)
+- [ ] Prueba manual con wallet de navegador en devnet (usuario): conectar, alta, compra, apuesta, cash-out, apuesta en cola
+- [x] Revisión de seguridad: semilla solo tras el preflight del reveal y nunca en logs; validación de la entrada del feed y CORS; cola solo con clave de sesión y límites revalidados; nada secreto en `NEXT_PUBLIC_*`; límites de dependencias
+
+### 8. Documentación
+- [x] `changelog.md` (la entrada de 5 s sin commitear queda superada por la de 15 s), `CLAUDE.md` (comandos `operator:config` y feed, variables, estructura), `.env.example` (`NEXT_PUBLIC_CRASH_LIVE_FEED_URL`)
+
+### 9. Pendiente (decisión del usuario)
+- [ ] RPC propia (web y crank): con la pública esta IP recibió ≈ 35 respuestas 429/min y pasos retrasados decenas de segundos; ya bloquea jugar y el E2E
+- [ ] Plan vs programa: el crank intentó `void_round` por commit-timeout (ronda 109) y el programa respondió `DeadlineNotReached`; revisar el plazo exacto que usa el programa en `Betting`
+- [ ] Velocidad de la curva: con slots de 230 ms, v1 va ≈ 1.74× más rápida de lo diseñado; cambiarla exige reglas v2 (+ vectores) y cambio del programa
+- [ ] Hosting público del canal en vivo (TLS/proxy) cuando la web se despliegue
+
+### Notas
+- Pausa total entre rondas prevista: crash visible ≈ 2.5 s (en paralelo a las apuestas) + 15 s de apuestas + ≈ 5–9 s de randomness de Switchboard.
+- El seed publicado por el feed tras el preflight no da ventaja: `settle_bet` solo acepta cash-outs manuales con `tick < crash_tick`, y el propio `reveal` ya pone la semilla en la red en ese momento. `reveal` es sin permisos: un consumidor del feed podría revelar, lo que solo sirve de respaldo de disponibilidad.
+
+---
+
 ## Iteración 8 — Versión funcional mínima (crank, web, History y Fairness)
 
 Iniciada el 2026-09-29. Revisión previa: JS (151 pruebas, lint, typecheck) y Rust (38 pruebas, fmt) en verde; `pnpm audit` con las 2 moderadas conocidas. Decisiones del usuario: crank en Node dentro del repo, clave de sesión en `localStorage`, codec propio sin el cliente TS de Anchor, alcance Crash + Fairness + History.
@@ -66,6 +142,7 @@ Iniciada el 2026-09-28. Decisiones del usuario: opción A (saldo on-chain + clav
 ### 3. Pendiente
 - [x] Despliegue en devnet según la spec v2 §13 (bank de v1.1 retirado; v2 en `DNmfJ…`, binario verificado) y prueba end-to-end con el Switchboard real (9 rondas reveladas, 19 liquidaciones sin discrepancias)
 - [x] Timeouts ampliados en devnet (2026-09-29): `betting_slots` 25 → 50 y `entropy_timeout_slots` 150 → 300, con `update_config`
+- [x] Juego continuo (2026-09-29): `betting_slots` 50 → 13 (≈ 5 s de apuestas entre rondas) y el crank sin pausa extra
 - [ ] Spec de progresión (`PROGRESSION_V1`) con vectores
 - [ ] ADR del backend del chat (base de datos, hosting, WebSockets)
 

@@ -2,7 +2,9 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PublicKey } from "@solana/web3.js";
 import { afterEach, describe, expect, it } from "vitest";
+import { bettingSlotsFor, parseBettingSeconds, updatedConfigArgs } from "./admin-config-math";
 import { isInside, parseOperatorConfig } from "./config";
 import { createLogger } from "./logger";
 import { createFileSeedStore } from "./seed-store";
@@ -58,9 +60,22 @@ describe("operator config", () => {
     );
     expect(config).toMatchObject({
       rpcUrl: "https://api.devnet.solana.com",
-      pauseBetweenRoundsMs: 3_000,
+      pauseBetweenRoundsMs: 0,
       priorityFeeMicroLamports: 1_000,
+      liveFeed: { port: 8787, allowedOrigin: "http://localhost:3000" },
     });
+  });
+
+  it("treats empty env-file values as defaults and can disable the live feed", () => {
+    const base = { CRASH_OPERATOR_KEYPAIR: join(outside, "id.json"), CRASH_OPERATOR_STATE_DIR: join(outside, "state") };
+    expect(parseOperatorConfig({ ...base, CRASH_OPERATOR_POLL_MS: "", CRASH_OPERATOR_LIVE_PORT: "" }, repo)).toMatchObject({
+      pollIntervalMs: 800,
+      liveFeed: { port: 8787 },
+    });
+    expect(parseOperatorConfig({ ...base, CRASH_OPERATOR_LIVE_PORT: "0" }, repo).liveFeed).toBeNull();
+    expect(() => parseOperatorConfig({ ...base, CRASH_OPERATOR_LIVE_ORIGIN: "http://localhost:3000/path" }, repo)).toThrow(
+      /CRASH_OPERATOR_LIVE_ORIGIN/,
+    );
   });
 
   it("refuses secrets or seeds inside the repository", () => {
@@ -90,6 +105,52 @@ describe("operator config", () => {
     }
     expect(message).toMatch(/CRASH_OPERATOR_RPC_URL/);
     expect(message).not.toContain("SECRET");
+  });
+});
+
+describe("admin config", () => {
+  it("parses whole seconds within bounds, with or without pnpm's `--`", () => {
+    expect(parseBettingSeconds(["--", "--betting-seconds", "15"])).toBe(15);
+    expect(parseBettingSeconds(["--betting-seconds", "15"])).toBe(15);
+    expect(() => parseBettingSeconds([])).toThrow(/usage/);
+    expect(() => parseBettingSeconds(["--betting-seconds", "1.5"])).toThrow(/usage/);
+    expect(() => parseBettingSeconds(["--betting-seconds", "600"])).toThrow(/between/);
+  });
+
+  it("converts seconds to enough slots at the measured rate", () => {
+    expect(bettingSlotsFor(15, 230)).toBe(66n);
+    expect(bettingSlotsFor(15, 400)).toBe(38n);
+    // An implausible measurement is clamped rather than trusted.
+    expect(bettingSlotsFor(15, 10)).toBe(100n);
+  });
+
+  it("changes only betting_slots", () => {
+    const key = PublicKey.unique();
+    const config = {
+      admin: key,
+      operator: key,
+      rulesVersion: 1,
+      limits: { minStake: 1n, maxStake: 2n, maxPayout: 3n, maxRoundExposure: 4n },
+      maxBetsPerRound: 256,
+      timeouts: { bettingSlots: 13n, entropyTimeoutSlots: 300n, revealGraceSlots: 150n },
+      playerPolicy: { maxSessionSlots: 5n, usernameCooldownSlots: 6n },
+      paused: false,
+      nextRoundId: 1n,
+      currentRound: null,
+      randomnessAccount: key,
+      bump: 0,
+      vaultBump: 0,
+      randomnessAuthorityBump: 0,
+    };
+    expect(updatedConfigArgs(config, 66n)).toEqual({
+      operator: key,
+      limits: config.limits,
+      timeouts: { bettingSlots: 66n, entropyTimeoutSlots: 300n, revealGraceSlots: 150n },
+      maxBetsPerRound: 256,
+      paused: false,
+      playerPolicy: config.playerPolicy,
+    });
+    expect(() => updatedConfigArgs(config, 0n)).toThrow(/positive/);
   });
 });
 

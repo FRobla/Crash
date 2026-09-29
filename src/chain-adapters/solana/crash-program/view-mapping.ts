@@ -36,8 +36,11 @@ export function toLiveRound(round: RoundAccount) {
     rulesVersion: round.rulesVersion,
     phase,
     commitHex: toHex(round.commit),
+    openedTick: round.openedSlot,
     bettingEndTick: round.bettingEndSlot,
     startTick: started ? round.startSlot : null,
+    /** Written by `start_round`; lets the web verify a seed from the live feed (ADR 0004). */
+    vrfOutputHex: started ? toHex(round.vrfOutput) : null,
     crashPoint: revealed ? round.crashPoint : null,
     crashTick: revealed ? round.crashTick : null,
     betCount: round.betCount,
@@ -54,17 +57,27 @@ export function toRoundSummary(round: RoundAccount) {
   };
 }
 
+/** Why a devnet airdrop failed, pointing at the web faucet when the RPC throttles it. */
+export function airdropFailureReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/429|rate|limit|too many|faucet has run dry|airdrop request limit/i.test(message)) {
+    return "the RPC faucet is rate-limited: use faucet.solana.com instead";
+  }
+  return `airdrop failed (${message.split("\n")[0].slice(0, 120)}); try faucet.solana.com`;
+}
+
 /** Two base fees: below this a session key cannot pay for a bet and a settlement. */
 export const MIN_SESSION_FEE_LAMPORTS = 10_000n;
-export const APPROX_SECONDS_PER_SLOT = 0.4;
 
 export type SessionStatus = "active" | "expired" | "other-device" | "out-of-fees" | "none";
 
+/** `msPerSlot` is the measured slot duration (spec crash-client-v1 §5.1), only for the estimate. */
 export function sessionView(
   player: PlayerAccount | null,
   localKey: PublicKey | null,
   slot: bigint | null,
   sessionLamports: bigint | null,
+  msPerSlot: number,
 ) {
   const session = player?.session ?? null;
   if (!session) return { status: "none" as SessionStatus, spendCap: 0n, spent: 0n, expiresInSeconds: null };
@@ -72,7 +85,7 @@ export function sessionView(
   if (!localKey || !localKey.equals(session.key)) status = "other-device";
   else if (slot !== null && slot > session.expiresSlot) status = "expired";
   else if (sessionLamports !== null && sessionLamports < MIN_SESSION_FEE_LAMPORTS) status = "out-of-fees";
-  const expiresInSeconds = slot === null ? null : Number(session.expiresSlot - slot) * APPROX_SECONDS_PER_SLOT;
+  const expiresInSeconds = slot === null ? null : (Number(session.expiresSlot - slot) * msPerSlot) / 1000;
   return { status, spendCap: session.spendCap, spent: session.spent, expiresInSeconds };
 }
 

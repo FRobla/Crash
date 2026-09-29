@@ -53,7 +53,7 @@ export function RoundFeed({ verifyHref }: { verifyHref: (roundId: bigint) => str
             {recentRounds.map((round, index) => {
               const outcome = outcomeText(round);
               return (
-                <li key={round.roundId.toString()} className={index === 0 ? "animate-pop-in" : undefined}>
+                <li key={round.roundId.toString()} className={index === 0 ? "animate-fly-in" : undefined}>
                   <Link
                     href={verifyHref(round.roundId)}
                     className={`inline-flex items-baseline gap-2 rounded-md border bg-surface-raised/40 px-2 py-1 text-sm tabular-nums transition-colors hover:bg-surface-raised ${outcome.tone}`}

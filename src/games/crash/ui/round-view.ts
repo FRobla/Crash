@@ -9,11 +9,9 @@ import type { CrashGamePort, LiveRound, MyBet } from "./crash-game";
 
 /**
  * Pure view logic for the live round (spec crash-client-v1 §5–6). It decides what the UI may
- * offer; the program still decides what is accepted.
+ * offer; the program still decides what is accepted. Durations use the measured tick length the
+ * port reports, never a nominal one.
  */
-
-/** Nominal slot duration, only to turn slot counts into approximate seconds. */
-export const APPROX_SECONDS_PER_TICK = 0.4;
 
 const curves = new Map<number, MultiplierCurve>();
 
@@ -33,38 +31,71 @@ export function multiplierAt(rules: CrashRules, tick: bigint): Multiplier {
   return recognizedMultiplierAtTick(curve, index);
 }
 
+/** A round as the UI shows it: `provisional` marks a crash verified from the live feed's seed. */
+export type ShownRound = LiveRound & { provisional?: boolean };
+
 export type RoundDisplay =
   | { kind: "idle" }
-  | { kind: "betting"; secondsLeft: number }
-  | { kind: "awaiting-entropy" }
+  | { kind: "betting"; msLeft: number; secondsLeft: number }
+  /** Betting closed; waiting for verifiable randomness before take-off. */
+  | { kind: "launching" }
   /** The multiplier is a projection until the reveal. */
   | { kind: "running"; multiplier: Multiplier }
-  | { kind: "crashed"; crashPoint: Multiplier }
+  /** `provisional`: verified against the on-chain commit, on-chain reveal still pending. */
+  | { kind: "crashed"; crashPoint: Multiplier; provisional: boolean }
   | { kind: "voided" }
   | { kind: "forfeited" };
 
-export function roundDisplay(round: LiveRound | null, tick: bigint | null): RoundDisplay {
+/** Time left to bet at the measured tick length, from a (possibly fractional) projected tick. */
+export function bettingMsLeft(round: Pick<LiveRound, "bettingEndTick">, tick: number | null, msPerTick: number): number {
+  if (tick === null) return 0;
+  return Math.max(0, (Number(round.bettingEndTick) - tick) * msPerTick);
+}
+
+/** Length of the round's betting window in ms, at the measured tick length. */
+export function bettingWindowMs(round: Pick<LiveRound, "openedTick" | "bettingEndTick">, msPerTick: number): number {
+  return Math.max(0, Number(round.bettingEndTick - round.openedTick) * msPerTick);
+}
+
+export function roundDisplay(round: ShownRound | null, tick: number | null, msPerTick: number): RoundDisplay {
   if (!round) return { kind: "idle" };
   const rules = rulesForVersion(round.rulesVersion);
   switch (round.phase) {
     case "betting": {
-      const left = tick === null ? 0n : round.bettingEndTick - tick;
-      return { kind: "betting", secondsLeft: Math.max(0, Math.ceil(Number(left) * APPROX_SECONDS_PER_TICK)) };
+      const msLeft = bettingMsLeft(round, tick, msPerTick);
+      return { kind: "betting", msLeft, secondsLeft: Math.ceil(msLeft / 1000) };
     }
     case "awaiting-entropy":
-      return { kind: "awaiting-entropy" };
+      return { kind: "launching" };
     case "running": {
       if (!rules || round.startTick === null || tick === null) return { kind: "running", multiplier: ONE_X };
-      return { kind: "running", multiplier: multiplierAt(rules, tick - round.startTick) };
+      return { kind: "running", multiplier: multiplierAt(rules, BigInt(Math.floor(tick)) - round.startTick) };
     }
     case "crashed":
     case "settled":
-      return round.crashPoint === null ? { kind: "idle" } : { kind: "crashed", crashPoint: round.crashPoint };
+      return round.crashPoint === null
+        ? { kind: "idle" }
+        : { kind: "crashed", crashPoint: round.crashPoint, provisional: round.provisional === true };
     case "voided":
       return { kind: "voided" };
     case "forfeited":
       return { kind: "forfeited" };
   }
+}
+
+export interface EarlyCrash {
+  roundId: bigint;
+  crashPoint: Multiplier;
+  crashTick: bigint;
+}
+
+/**
+ * Applies a verified crash from the live feed to a running round, as a provisional result.
+ * Only a running round changes: once the account is revealed (or voided/forfeited) it wins.
+ */
+export function applyEarlyCrash(round: LiveRound | null, early: EarlyCrash | null): ShownRound | null {
+  if (!round || !early || early.roundId !== round.roundId || round.phase !== "running") return round;
+  return { ...round, phase: "crashed", crashPoint: early.crashPoint, crashTick: early.crashTick, provisional: true };
 }
 
 const TERMINAL: readonly RoundPhase[] = ["crashed", "settled", "voided", "forfeited"];

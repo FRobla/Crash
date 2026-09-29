@@ -1,15 +1,18 @@
 "use client";
 
-import { Coins, Target } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { Clock, Coins, PartyPopper, Target, X } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { formatCoins, parseCoins } from "@/platform/player-accounts/coins";
 import { Panel } from "@/platform/shell/Panel";
 import { ActionStatus } from "@/platform/transactions/ActionStatus";
 import { isBusy } from "@/platform/transactions/action-state";
+import { validateBet, type BetLimits } from "../domain/limits";
+import { rulesForVersion } from "../domain/rules";
 import { payoutFor, type Amount, type Multiplier } from "../domain/units";
-import { useCrashGame } from "./crash-game";
+import { useCrashGame, type CrashGamePort } from "./crash-game";
 import { formatMultiplier, parseMultiplierText } from "./multiplier-text";
 import {
+  applyEarlyCrash,
   autoTargetReached,
   betAwaitingSettlement,
   cashedOutAt,
@@ -19,7 +22,62 @@ import {
   projectedMultiplier,
   type MyBetOutcome,
 } from "./round-view";
+import { playSound } from "./sound";
+import { useEarlyCrash } from "./use-early-crash";
 import { useEstimatedTick } from "./use-estimated-tick";
+
+/** A bet waiting for the next round (spec crash-client-v1 §6.2): one, in memory, cancelable. */
+interface QueuedBet {
+  stake: Amount;
+  autoCashOut: Multiplier | null;
+  /** Placed in the first betting round after this one. */
+  afterRoundId: bigint;
+  /** What it was validated against; any change clears it. */
+  limitsKey: string;
+  balance: Amount | null;
+}
+
+function limitsKey(limits: BetLimits | null): string {
+  return limits ? [limits.minStake, limits.maxStake, limits.maxPayout, limits.maxRoundExposure].join(":") : "";
+}
+
+/** Why a bet cannot be queued now, or null. The program still checks everything when it is sent. */
+function queueBlocker(game: CrashGamePort, stake: Amount, autoCashOut: Multiplier | null): string | null {
+  if (game.playerBlocker) return game.playerBlocker;
+  if (game.paused) return "The house is paused.";
+  const rules = game.round ? rulesForVersion(game.round.rulesVersion) : null;
+  if (!game.limits || !rules) return "House limits not loaded.";
+  if (game.balance !== null && stake > game.balance) return "Not enough coins.";
+  const result = validateBet({ stake, autoCashOut }, game.limits, rules.maxMultiplier);
+  return result.ok ? null : "Check the stake and auto cash-out.";
+}
+
+/**
+ * Remembers a win the rules granted until its settlement lands, then reports it once, when the
+ * confirmed balance reflects it. Never celebrates a projection.
+ */
+function useConfirmedWin(game: CrashGamePort, outcome: MyBetOutcome): { roundId: bigint; payout: Amount } | null {
+  const [pending, setPending] = useState<{ roundId: bigint; payout: Amount; balance: Amount | null } | null>(null);
+  const [won, setWon] = useState<{ roundId: bigint; payout: Amount } | null>(null);
+  const betRound = game.myBet?.roundId ?? null;
+  if (outcome.kind === "cashed-out" && betRound !== null && pending?.roundId !== betRound) {
+    setPending({ roundId: betRound, payout: outcome.payout, balance: game.balance });
+  }
+  if (pending && betRound !== pending.roundId) {
+    // The bet left the account: settled. Celebrate only if the balance actually grew.
+    if (game.balance !== null && pending.balance !== null && game.balance > pending.balance) {
+      setWon({ roundId: pending.roundId, payout: pending.payout });
+    }
+    setPending(null);
+  }
+  useEffect(() => {
+    if (!won) return;
+    playSound("cashout");
+    const id = setTimeout(() => setWon(null), 2_600);
+    return () => clearTimeout(id);
+  }, [won]);
+  return won;
+}
 
 const INPUT_CLASS =
   "w-full min-w-0 rounded-md border border-border bg-bg px-3 py-2 text-sm tabular-nums text-fg transition-colors placeholder:text-muted hover:border-border-strong focus:border-accent/60 disabled:cursor-not-allowed disabled:opacity-60";
@@ -50,25 +108,84 @@ export function BetPanel() {
     check = { ok: false, reason: "Auto cash-out: a multiplier such as 2 or 1.50." };
   }
 
-  const offer = cashOutOffer(game.round, game.myBet, tick);
-  const pendingPrevious = betAwaitingSettlement(game.myBet, game.round);
-  const outcome = myBetOutcome(game.round, game.myBet);
-  const recordedCashOut = cashedOutAt(game.round, game.myBet);
-  const bettingOpen = game.round?.phase === "betting";
-  const projected = projectedMultiplier(game.round, tick);
+  // A crash verified from the live feed ends the round for the offer and the outcome (§5.2).
+  const early = useEarlyCrash(game);
+  const round = applyEarlyCrash(game.round, early);
+  const offer = cashOutOffer(round, game.myBet, tick);
+  const pendingPrevious = betAwaitingSettlement(game.myBet, round);
+  const outcome = myBetOutcome(round, game.myBet);
+  const recordedCashOut = cashedOutAt(round, game.myBet);
+  const bettingOpen = round?.phase === "betting";
+  const projected = projectedMultiplier(round, tick);
   const autoReached =
     game.myBet !== null &&
-    game.myBet.roundId === game.round?.roundId &&
+    game.myBet.roundId === round?.roundId &&
     game.myBet.cashOutTick === null &&
     projected !== null &&
     autoTargetReached(game.myBet, projected);
+  const win = useConfirmedWin(game, outcome);
+
+  // ---- Bet next round (queue) ----
+  const [queued, setQueued] = useState<QueuedBet | null>(null);
+  const stakeValue = stake.ok ? stake.baseUnits : null;
+  const autoValue = auto === null ? null : auto.ok ? auto.multiplier : undefined;
+  const queueReason = stakeValue === null || autoValue === undefined ? "Enter a valid bet." : queueBlocker(game, stakeValue, autoValue);
+  const canQueue = !bettingOpen && round !== null && queued === null && !game.paused;
+  // Adjusting state during render: a queued bet is dropped as soon as what it was checked
+  // against changes (wallet or session, house limits, a lower balance).
+  if (
+    queued &&
+    (game.playerBlocker !== null ||
+      limitsKey(game.limits) !== queued.limitsKey ||
+      (queued.balance !== null && game.balance !== null && game.balance < queued.balance))
+  ) {
+    setQueued(null);
+    setFormError("Queued bet cancelled: your account or the house limits changed.");
+  }
+  const placing = useRef(false);
+  useEffect(() => {
+    if (!queued || !game.round || game.round.phase !== "betting" || game.round.roundId <= queued.afterRoundId) return;
+    if (busy || placing.current) return;
+    // Revalidate against the round that is now open, then send it once.
+    const recheck = checkNewBet(game, game.estimatedTick(), queued.stake, queued.autoCashOut);
+    placing.current = true;
+    const bet = queued;
+    void Promise.resolve().then(async () => {
+      setQueued(null);
+      if (!recheck.ok) setFormError(`Queued bet not placed: ${recheck.reason}`);
+      else await game.placeBet(bet.stake, bet.autoCashOut ?? 0n);
+      placing.current = false;
+    });
+  }, [busy, game, queued]);
+
+  /** Outside a betting window with a round on screen, the form queues for the next round. */
+  const queueMode = !bettingOpen && round !== null && round.phase !== "betting" && !game.paused;
+  const queueReasonShown = queued ? "A bet is already queued for the next round." : queueReason;
+
+  function queueBet() {
+    if (!canQueue || round === null || stakeValue === null || autoValue === undefined || queueReason) {
+      return setFormError(queueReason ?? "Cannot queue a bet now.");
+    }
+    setFormError(null);
+    setQueued({
+      stake: stakeValue,
+      autoCashOut: autoValue,
+      afterRoundId: round.roundId,
+      limitsKey: limitsKey(game.limits),
+      balance: game.balance,
+    });
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (queueMode) return queueBet();
     if (!stake.ok || !check.ok) return setFormError(check.reason ?? "Invalid bet.");
     setFormError(null);
     await game.placeBet(stake.baseUnits, auto && auto.ok ? auto.multiplier : 0n);
   }
+
+  const shortOfCoins =
+    game.playerBlocker === null && game.balance !== null && (game.balance === 0n || (stake.ok && stake.baseUnits > game.balance));
 
   function setStake(value: Amount) {
     setFormError(null);
@@ -111,6 +228,40 @@ export function BetPanel() {
             <span className="sr-only"> · </span>
             <span className="text-sm font-normal tabular-nums text-fg">{formatCoins(offer.payout)} coins</span>
           </button>
+        )}
+
+        {win && (
+          <p
+            key={`win-${win.roundId}`}
+            role="status"
+            className="flex items-center justify-center gap-2 rounded-md border border-accent/50 bg-accent/10 px-3 py-2 text-lg font-semibold text-accent motion-safe:animate-celebrate"
+          >
+            <PartyPopper aria-hidden="true" className="size-5" />
+            +{formatCoins(win.payout)} coins
+            <span className="sr-only"> won in round #{win.roundId.toString()}, settled</span>
+          </p>
+        )}
+
+        {queued && (
+          <section aria-label="Queued bet" className="flex items-center gap-2 rounded-md border border-info/40 bg-info/5 p-3 text-sm">
+            <Clock aria-hidden="true" className="size-4 shrink-0 text-info" />
+            <p className="min-w-0 flex-1">
+              <span className="text-[11px] uppercase tracking-widest text-muted">Next round · </span>
+              <span className="tabular-nums">
+                {formatCoins(queued.stake)} coins
+                {queued.autoCashOut !== null && ` · auto ${formatMultiplier(queued.autoCashOut)}`}
+              </span>
+              <span className="block text-xs text-muted">Placed with your session when betting opens, after a fresh check.</span>
+            </p>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-muted hover:border-border-strong hover:text-fg"
+              onClick={() => setQueued(null)}
+            >
+              <X aria-hidden="true" className="size-3" />
+              Cancel
+            </button>
+          </section>
         )}
 
         {game.myBet && (
@@ -212,17 +363,33 @@ export function BetPanel() {
 
           <BetPreview stake={stake.ok ? stake.baseUnits : null} auto={auto && auto.ok ? auto.multiplier : null} />
 
-          <button
-            type="submit"
-            className={`${PRIMARY_CLASS} ${bettingOpen && check.ok && !busy ? "shadow-[0_0_24px_-6px] shadow-accent/50" : ""}`}
-            disabled={busy || !check.ok}
-            aria-describedby="bet-blocker"
-          >
-            {pendingPrevious ? "Settle & place bet" : "Place bet"}
-          </button>
+          {queueMode ? (
+            <button
+              type="submit"
+              className={`${PRIMARY_CLASS} border-info/50 bg-info/10 text-info hover:bg-info/20`}
+              disabled={busy || queueReasonShown !== null}
+              aria-describedby="bet-blocker"
+            >
+              Bet next round
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className={`${PRIMARY_CLASS} ${bettingOpen && check.ok && !busy ? "shadow-[0_0_24px_-6px] shadow-accent/50" : ""}`}
+              disabled={busy || !check.ok}
+              aria-describedby="bet-blocker"
+            >
+              {pendingPrevious ? "Settle & place bet" : "Place bet"}
+            </button>
+          )}
           <p id="bet-blocker" className="-mt-2 min-h-4 text-xs text-warn">
-            {formError ?? (check.ok ? "" : check.reason)}
+            {formError ?? (queueMode ? (queueReasonShown ?? "") : check.ok ? "" : check.reason)}
           </p>
+          {shortOfCoins && (
+            <a href="#buy-coins" className="-mt-2 text-xs text-accent underline hover:no-underline">
+              Buy coins in the account panel
+            </a>
+          )}
         </form>
         <ActionStatus action={game.action} explorerUrl={game.explorerUrl} />
       </div>
