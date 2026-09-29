@@ -6,26 +6,29 @@ import { Panel } from "@/platform/shell/Panel";
 import { StatusItem } from "@/platform/shell/StatusItem";
 import type { StatusTone } from "@/platform/shell/status-tone";
 import type { RoundPhase } from "../domain/round-lifecycle";
-import { rulesForVersion } from "../domain/rules";
-import { interpolatedMultiplier } from "./chart-geometry";
-import { CrashChart, PRESENTATION_LAG_TICKS } from "./CrashChart";
+import { formatCoins } from "@/platform/player-accounts/coins";
+import { ONE_X, payoutFor, type Multiplier } from "../domain/units";
+import { toNumber } from "./chart-geometry";
+import { CrashChart, TIER_TEXT } from "./CrashChart";
 import { useCrashGame, type CrashGamePort, type LiveRound } from "./crash-game";
+import { intensity, intensityTier, lastMilestone } from "./live-intensity";
 import { formatMultiplier } from "./multiplier-text";
 import {
   applyEarlyCrash,
   bettingMsLeft,
   bettingWindowMs,
   cashedOutAt,
-  curveForRules,
-  multiplierAt,
+  myBetOutcome,
   roundDisplay,
   type RoundDisplay,
   type ShownRound,
 } from "./round-view";
-import { playSound, setSoundEnabled, useSoundEnabled } from "./sound";
+import { playSound, setRise, setSoundEnabled, startRise, stopRise, useSoundEnabled } from "./sound";
 import { useEarlyCrash } from "./use-early-crash";
 import { useEstimatedTick } from "./use-estimated-tick";
 import { useFrameValue, useReducedMotion } from "./use-frame-value";
+import { usePlayout } from "./use-playout";
+import { useShownMultiplier } from "./use-shown-multiplier";
 
 const CONNECTION: Record<string, { value: string; tone: StatusTone }> = {
   connecting: { value: "connecting", tone: "warn" },
@@ -55,6 +58,9 @@ const LIVE_ANNOUNCEMENT: Partial<Record<RoundDisplay["kind"], string>> = {
   betting: "Betting open",
   running: "Round running",
 };
+
+/** Phases that share the top-left headline over the curve; the number is never remounted between them. */
+const CURVE_KINDS: ReadonlySet<RoundDisplay["kind"]> = new Set(["launching", "running", "crashed"]);
 
 /** A crash stays on screen at least this long, even if the next round already takes bets. */
 export const CRASH_HOLD_MS = 2_500;
@@ -119,7 +125,7 @@ function useCrashHold(round: ShownRound | null): { held: ShownRound | null; stag
 export function CrashConsole() {
   const game = useCrashGame();
   const early = useEarlyCrash(game);
-  const live = applyEarlyCrash(game.round, early);
+  const live = usePlayout(applyEarlyCrash(game.round, early), game);
   const tick = useEstimatedTick(game, 250);
   const liveDisplay = roundDisplay(live, tick === null ? null : Number(tick), game.msPerTick());
   const { held, stage } = useCrashHold(live);
@@ -129,6 +135,9 @@ export function CrashConsole() {
   const connection = CONNECTION[game.connection];
   const feed = LIVE_FEED[game.liveFeed];
   useRoundSounds(display, shown?.roundId ?? null);
+  const recordedCashOut = recordedCashOutIn(shown, game);
+  useCashOutCue(recordedCashOut ? shown!.roundId : null);
+  const curveLayout = !loading && CURVE_KINDS.has(display.kind);
 
   return (
     <Panel
@@ -164,13 +173,21 @@ export function CrashConsole() {
             className="pointer-events-none absolute inset-0 animate-crash-flash bg-[radial-gradient(circle_at_center,rgb(248_113_113/0.45),transparent_70%)]"
           />
         )}
-        {/* While a curve is drawn the headline sits top-left, the one area a rising curve never crosses. */}
+        {recordedCashOut && display.kind === "running" && (
+          <div
+            key={`cash-out-flash-${shown!.roundId}`}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 animate-crash-flash bg-[radial-gradient(circle_at_center,rgb(74_222_128/0.35),transparent_70%)]"
+          />
+        )}
+        {/*
+          While a curve is drawn the headline sits top-left, the one area a rising curve never
+          crosses. Launch, run and crash share that container, so the number stays in place.
+        */}
         <div
-          key={loading ? "loading" : display.kind}
+          key={loading ? "loading" : curveLayout ? "curve" : display.kind}
           className={`pointer-events-none relative flex h-full animate-fade-in flex-col gap-2 px-4 ${
-            display.kind === "running" || display.kind === "crashed"
-              ? "items-start justify-start pt-5 pl-16 sm:pl-20"
-              : "items-center justify-center pb-6"
+            curveLayout ? "items-start justify-start pt-5 pl-16 sm:pl-20" : "items-center justify-center pb-6"
           }`}
         >
           {LIVE_ANNOUNCEMENT[liveDisplay.kind] && <p className="sr-only">{screenReaderText(liveDisplay)}</p>}
@@ -217,6 +234,24 @@ function useRoundSounds(display: RoundDisplay, roundId: bigint | null) {
   }, [display.kind, key]);
 }
 
+/** The player's cash-out recorded on-chain in the round on screen, if any. */
+function recordedCashOutIn(round: ShownRound | null, game: Pick<CrashGamePort, "myBet">): Multiplier | null {
+  const bet = game.myBet;
+  if (!round || !bet || bet.roundId !== round.roundId || bet.cashOutTick === null) return null;
+  return cashedOutAt(round, bet);
+}
+
+/** The cash-out sound when a recorded cash-out first appears (not when the page loads with one). */
+function useCashOutCue(roundId: bigint | null) {
+  const previous = useRef<bigint | null | undefined>(undefined);
+  useEffect(() => {
+    const first = previous.current === undefined;
+    const changed = previous.current !== roundId;
+    previous.current = roundId;
+    if (!first && changed && roundId !== null) playSound("cashout");
+  }, [roundId]);
+}
+
 function SoundToggle() {
   const on = useSoundEnabled();
   return (
@@ -244,6 +279,7 @@ function HeadlineSkeleton() {
 }
 
 function Headline({ display, round, game }: { display: RoundDisplay; round: ShownRound | null; game: CrashGamePort }) {
+  if (CURVE_KINDS.has(display.kind)) return <CurveHeadline display={display} round={round} game={game} />;
   switch (display.kind) {
     case "idle":
       return (
@@ -254,42 +290,6 @@ function Headline({ display, round, game }: { display: RoundDisplay; round: Show
       );
     case "betting":
       return round ? <BettingCountdown round={round} game={game} /> : null;
-    case "launching":
-      return (
-        <>
-          <p aria-hidden="true" className="flex items-center gap-3 text-5xl font-semibold tracking-tight text-muted sm:text-7xl">
-            <Rocket className="size-9 animate-launch text-info sm:size-12" />
-            1.00x
-          </p>
-          <div aria-hidden="true" className="h-0.5 w-40 overflow-hidden rounded-full bg-info/15">
-            <div className="h-full w-1/3 animate-indeterminate rounded-full bg-info" />
-          </div>
-          <Caption>
-            <span className="text-fg">launching</span> · bets closed · waiting for verifiable randomness
-          </Caption>
-        </>
-      );
-    case "running":
-      return (
-        <>
-          {round && <LiveMultiplier round={round} game={game} />}
-          <Caption>running · estimated from the slot clock</Caption>
-        </>
-      );
-    case "crashed":
-      return (
-        <div key={`crashed-${round?.roundId}`} className="flex animate-shake flex-col items-start gap-1">
-          <span className="rounded bg-danger/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.3em] text-danger">
-            crashed
-          </span>
-          <BigNumber className="text-danger drop-shadow-[0_0_24px_rgb(248_113_113/0.35)]">
-            {formatMultiplier(display.crashPoint)}
-          </BigNumber>
-          <Caption>
-            {display.provisional ? "verified against the commit · on-chain reveal pending" : "revealed on-chain · verifiable"}
-          </Caption>
-        </div>
-      );
     case "voided":
       return (
         <>
@@ -308,22 +308,146 @@ function Headline({ display, round, game }: { display: RoundDisplay; round: Show
 }
 
 /**
- * The running multiplier, continuous between ticks (presentation only; spec §5.2). It trails the
- * projection by the same lag as the curve, and with reduced motion shows whole ticks only.
+ * Launch, run and crash in one place (spec crash-client-v1 §5.2): 1.00x waits at the origin, starts
+ * counting there at take-off and turns red there at the crash.
  */
-function LiveMultiplier({ round, game }: { round: LiveRound; game: CrashGamePort }) {
+function CurveHeadline({ display, round, game }: { display: RoundDisplay; round: ShownRound | null; game: CrashGamePort }) {
+  const recorded = recordedCashOutIn(round, game);
+  return (
+    <div className="flex flex-col items-start gap-1.5">
+      <div className={display.kind === "crashed" ? "animate-shake" : undefined}>
+        <HeadlineNumber display={display} round={round} game={game} humming={display.kind === "running" && recorded === null} />
+      </div>
+      {display.kind === "launching" && (
+        <>
+          <div aria-hidden="true" className="h-0.5 w-40 overflow-hidden rounded-full bg-info/15">
+            <div className="h-full w-1/3 animate-indeterminate rounded-full bg-info" />
+          </div>
+          <Caption>
+            <Rocket aria-hidden="true" className="mr-1.5 inline size-3.5 animate-launch text-info" />
+            <span className="text-fg">launching</span> · bets closed · waiting for verifiable randomness
+          </Caption>
+        </>
+      )}
+      {display.kind === "running" && <Caption>running · estimated from the slot clock</Caption>}
+      {display.kind === "crashed" && (
+        <div className="flex animate-rise-in flex-wrap items-center gap-2">
+          <span className="rounded bg-danger/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.3em] text-danger">
+            crashed
+          </span>
+          <Caption>
+            {display.provisional ? "verified against the commit · on-chain reveal pending" : "revealed on-chain · verifiable"}
+          </Caption>
+        </div>
+      )}
+      {round && <CashOutMark round={round} game={game} at={recorded} />}
+    </div>
+  );
+}
+
+/**
+ * The headline number. While running it shows the live multiplier every frame, colored by band,
+ * growing and glowing with it, and pulsing at each milestone; the rise tone follows it.
+ */
+function HeadlineNumber({
+  display,
+  round,
+  game,
+  humming,
+}: {
+  display: RoundDisplay;
+  round: ShownRound | null;
+  game: CrashGamePort;
+  humming: boolean;
+}) {
   const reduced = useReducedMotion();
-  const rules = rulesForVersion(round.rulesVersion);
-  const text = useFrameValue(() => {
-    const tick = game.projectedTick();
-    if (!rules || tick === null || round.startTick === null) return "1.00x";
-    const relative = Math.max(0, tick - Number(round.startTick) - PRESENTATION_LAG_TICKS);
-    if (reduced) return formatMultiplier(multiplierAt(rules, BigInt(Math.floor(relative))));
-    const value = interpolatedMultiplier(curveForRules(rules), relative);
-    // Truncated like recognized multipliers, so it never shows more than the curve reached.
-    return `${(Math.floor(value * 100) / 100).toFixed(2)}x`;
-  }, true);
-  return <BigNumber className="text-accent drop-shadow-[0_0_24px_rgb(74_222_128/0.35)] tabular-nums">{text}</BigNumber>;
+  const running = display.kind === "running";
+  const live = useShownMultiplier(running ? round : null, game, running);
+  const value = display.kind === "crashed" ? display.crashPoint : running ? live : ONE_X;
+  const milestone = running ? lastMilestone(value) : null;
+  useRiseTone(humming, value);
+  useMilestoneCue(round?.roundId ?? null, milestone);
+
+  const color = display.kind === "crashed" ? "text-danger" : running ? TIER_TEXT[intensityTier(value)] : "text-muted";
+  // Stepped so the style only changes a few dozen times over a whole round.
+  const grow = display.kind === "launching" ? 0 : Math.round(intensity(value) * 40) / 40;
+  return (
+    <p
+      aria-hidden="true"
+      className={`origin-top-left text-5xl font-semibold tracking-tight tabular-nums transition-[color,transform,filter] duration-300 sm:text-7xl ${color}`}
+      style={{
+        transform: reduced ? undefined : `scale(${1 + 0.3 * grow})`,
+        filter:
+          display.kind === "launching"
+            ? undefined
+            : `drop-shadow(0 0 ${Math.round(16 + 28 * grow)}px color-mix(in srgb, currentColor ${Math.round(35 + 35 * grow)}%, transparent))`,
+      }}
+    >
+      <span key={milestone?.toString() ?? "none"} className={`inline-block origin-left ${milestone ? "motion-safe:animate-milestone" : ""}`}>
+        {formatMultiplier(value)}
+      </span>
+    </p>
+  );
+}
+
+/** The rise tone plays while `active` and glides with the multiplier shown. */
+function useRiseTone(active: boolean, value: Multiplier) {
+  useEffect(() => {
+    if (!active) return;
+    startRise();
+    return () => stopRise();
+  }, [active]);
+  useEffect(() => {
+    if (active) setRise(toNumber(value));
+  }, [active, value]);
+}
+
+/** A short cue each time the running multiplier crosses a new milestone (not for ones already passed on load). */
+function useMilestoneCue(roundId: bigint | null, milestone: Multiplier | null) {
+  const seen = useRef<{ roundId: bigint | null; milestone: Multiplier | null } | null>(null);
+  useEffect(() => {
+    const previous = seen.current;
+    seen.current = { roundId, milestone };
+    if (!previous || previous.roundId !== roundId || milestone === null) return;
+    if (previous.milestone === null || milestone > previous.milestone) playSound("milestone");
+  }, [roundId, milestone]);
+}
+
+/**
+ * The player's recorded cash-out or win (manual or auto), in the headline. A record is not a win:
+ * it pays only if the crash point is at least the recognized multiplier (crash-round-rules §6),
+ * which the reveal decides.
+ */
+function CashOutMark({ round, game, at }: { round: ShownRound; game: CrashGamePort; at: Multiplier | null }) {
+  const outcome = myBetOutcome(round, game.myBet);
+  if (at === null && outcome.kind !== "cashed-out") return null;
+  if (outcome.kind === "cashed-out") {
+    return (
+      <p
+        key="won"
+        className="flex animate-pop-in items-baseline gap-2 rounded-md border border-accent/50 bg-accent/15 px-3 py-1.5 text-accent shadow-[0_0_28px_-6px] shadow-accent/60 backdrop-blur-sm"
+      >
+        <span className="text-xl font-semibold tabular-nums">+{formatCoins(outcome.payout)} coins</span>
+        <span className="text-xs text-fg">won at {formatMultiplier(outcome.multiplier)} · pending settlement</span>
+      </p>
+    );
+  }
+  if (outcome.kind === "lost" && at !== null) {
+    return (
+      <p key="late" className="rounded bg-bg/60 px-2 text-sm text-muted backdrop-blur-sm">
+        your cash-out at {formatMultiplier(at)} came after the crash
+      </p>
+    );
+  }
+  if (outcome.kind !== "open" || !game.myBet || at === null) return null;
+  return (
+    <p key="recorded" className="flex animate-pop-in items-baseline gap-2 rounded-md border border-accent/40 bg-bg/70 px-3 py-1.5 backdrop-blur-sm">
+      <span className="text-lg font-semibold text-accent tabular-nums">cashed out {formatMultiplier(at)}</span>
+      <span className="text-xs text-muted">
+        {formatCoins(payoutFor(game.myBet.stake, at))} coins if the crash point is ≥ {formatMultiplier(at)}
+      </span>
+    </p>
+  );
 }
 
 function BigNumber({ children, className }: { children: ReactNode; className: string }) {

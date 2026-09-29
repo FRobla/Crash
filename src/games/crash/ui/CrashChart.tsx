@@ -13,19 +13,14 @@ import {
   toNumber,
   type CurvePoint,
 } from "./chart-geometry";
+import { intensityTier, type IntensityTier } from "./live-intensity";
 import { formatMultiplier } from "./multiplier-text";
+import { presentationLag, presentedTick } from "./presentation-lag";
 import { curveForRules, multiplierAt, type RoundDisplay, type ShownRound } from "./round-view";
 import { useElementSize } from "./use-element-size";
 import { useFrameValue, useReducedMotion } from "./use-frame-value";
 
 const PAD = { left: 46, right: 18, top: 18, bottom: 26 };
-
-/**
- * The curve and the headline trail the slot projection by one tick: a jitter buffer, so a crash
- * verified from the live feed usually arrives before the curve passes it, and the curve climbs
- * exactly to the crash point instead of overshooting (spec crash-client-v1 §5.2).
- */
-export const PRESENTATION_LAG_TICKS = 1;
 
 interface CrashChartProps {
   game: Pick<CrashGamePort, "projectedTick" | "msPerTick">;
@@ -40,10 +35,18 @@ interface CrashChartProps {
 
 interface Series {
   samples: CurvePoint[];
-  tone: "running" | "crashed";
+  tone: "launching" | "running" | "crashed";
 }
 
+export const TIER_TEXT: Record<IntensityTier, string> = {
+  calm: "text-accent",
+  warm: "text-warn",
+  hot: "text-hot",
+};
+
 function seriesFor(round: LiveRound | null, display: RoundDisplay, relativeTick: number | null): Series | null {
+  // Waiting for take-off: the tip rests at the origin, where the curve will start.
+  if (round && display.kind === "launching") return { samples: [{ tick: 0, value: 1 }], tone: "launching" };
   if (!round || round.startTick === null) return null;
   const rules = rulesForVersion(round.rulesVersion);
   if (!rules) return null;
@@ -69,11 +72,15 @@ export function CrashChart({ game, round, display, fading, myBet, cashedOutAt }:
   const [hoverTick, setHoverTick] = useState<number | null>(null);
   const reduced = useReducedMotion();
   const startTick = round?.startTick ?? null;
+  const roundId = round?.roundId ?? null;
+  // A crash already known while the curve plays out caps it at the crash tick.
+  const crashTick = round?.crashTick ?? null;
   const running = display.kind === "running" && startTick !== null;
   const relativeTick = useFrameValue(() => {
     const tick = game.projectedTick();
-    if (tick === null || startTick === null) return null;
-    const relative = tick - Number(startTick) - PRESENTATION_LAG_TICKS;
+    if (tick === null || startTick === null || roundId === null) return null;
+    const presented = presentedTick(startTick, tick, presentationLag.forRound(roundId));
+    const relative = crashTick === null ? presented : Math.min(presented, Number(crashTick));
     return reduced ? Math.floor(relative) : relative;
   }, running);
   const secondsPerTick = game.msPerTick() / 1000;
@@ -99,9 +106,14 @@ export function CrashChart({ game, round, display, fading, myBet, cashedOutAt }:
 
   const line = samples.map((point, index) => `${index === 0 ? "M" : "L"}${x(point.tick).toFixed(1)},${y(point.value).toFixed(1)}`).join(" ");
   const area = lastSample ? `${line} L${x(lastSample.tick).toFixed(1)},${baseline} L${x(0)},${baseline} Z` : "";
-  const toneClass = series?.tone === "crashed" ? "text-danger" : "text-accent";
+  const toneClass =
+    series?.tone === "crashed"
+      ? "text-danger"
+      : series?.tone === "launching"
+        ? "text-muted"
+        : TIER_TEXT[intensityTier(BigInt(Math.floor((lastSample?.value ?? 1) * 100)) * 100n)];
 
-  const hover = hoverTick !== null && round && series ? hoverPoint(round, hoverTick) : null;
+  const hover = hoverTick !== null && round && series && series.tone !== "launching" ? hoverPoint(round, hoverTick) : null;
 
   function onPointerMove(event: PointerEvent<SVGSVGElement>) {
     if (!lastSample) return;
@@ -176,8 +188,19 @@ export function CrashChart({ game, round, display, fading, myBet, cashedOutAt }:
               <path d={area} fill={`url(#${gradientId})`} />
               <path d={line} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
               <circle cx={x(lastSample.tick)} cy={y(lastSample.value)} r="5" className="stroke-surface" fill="currentColor" strokeWidth="2" />
-              {series.tone === "running" && (
+              {series.tone !== "crashed" && (
                 <circle cx={x(lastSample.tick)} cy={y(lastSample.value)} r="5" fill="none" stroke="currentColor" strokeWidth="1.5" className="animate-halo" />
+              )}
+              {series.tone === "crashed" && round && (
+                <circle
+                  key={`burst-${round.roundId}`}
+                  cx={x(lastSample.tick)}
+                  cy={y(lastSample.value)}
+                  r="5"
+                  fill="none"
+                  stroke="currentColor"
+                  className="opacity-0 motion-safe:animate-burst"
+                />
               )}
             </g>
           )}

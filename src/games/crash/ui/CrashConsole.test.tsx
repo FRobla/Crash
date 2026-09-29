@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import devnet from "../fairness/fixtures/devnet-rounds.json";
 import { CRASH_HOLD_MS, CrashConsole } from "./CrashConsole";
 import { CrashGameProvider, type CrashGamePort, type LiveRound } from "./crash-game";
+import { ONE_X } from "../domain/units";
+import { MAX_LAG_TICKS, presentationLag } from "./presentation-lag";
 
 function round(overrides: Partial<LiveRound> = {}): LiveRound {
   return {
@@ -109,11 +111,13 @@ describe("CrashConsole", () => {
       vrfOutputHex: fixture.vrfOutput,
       startTick: 1_000n,
     });
+    // Far enough past the start that the lagged curve has reached any crash tick.
+    const past = 1_000n + BigInt(fixture.crashTick ?? 0) + BigInt(MAX_LAG_TICKS) + 1n;
     render(
       ui(
         game({
           round: running,
-          estimatedTick: () => 1_001n,
+          estimatedTick: () => past,
           programIdHex: devnet.programId,
           revealHint: { roundId: running.roundId, seedHex: fixture.seed },
           liveFeed: "live",
@@ -122,6 +126,75 @@ describe("CrashConsole", () => {
     );
     expect(await screen.findByText(/verified against the commit · on-chain reveal pending/)).toBeInTheDocument();
     expect(screen.getByText("crank:")).toBeInTheDocument();
+  });
+
+  it("never shows more than a 1.00x crash learned a few ticks after the start", () => {
+    let projected = 1_002;
+    const at = (phase: "running" | "crashed") =>
+      game({
+        round: round({ roundId: 900n, phase, startTick: 1_000n, ...(phase === "crashed" ? { crashPoint: ONE_X, crashTick: 0n } : {}) }),
+        estimatedTick: () => BigInt(Math.floor(projected)),
+        projectedTick: () => projected,
+      });
+    const { rerender } = render(ui(at("running")));
+    expect(screen.getByText("1.00x")).toBeInTheDocument();
+    // Learned 3 ticks after the start, within the playout lag: the curve never took off.
+    projected = 1_003;
+    rerender(ui(at("crashed")));
+    expect(screen.getByText("Crashed at 1.00x")).toBeInTheDocument();
+    expect(screen.getByText("1.00x")).toBeInTheDocument();
+  });
+
+  it("plays a crash learned late out to its crash point, never past it, then shows it", () => {
+    vi.useFakeTimers();
+    const lag = presentationLag.forRound(901n);
+    let projected = 1_010 + lag;
+    const at = (phase: "running" | "crashed") =>
+      game({
+        round: round({ roundId: 901n, phase, startTick: 1_000n, ...(phase === "crashed" ? { crashPoint: 15_000n, crashTick: 18n } : {}) }),
+        estimatedTick: () => BigInt(Math.floor(projected)),
+        projectedTick: () => projected,
+      });
+    const { rerender } = render(ui(at("running")));
+    projected = 1_014 + lag;
+    rerender(ui(at("crashed")));
+    expect(screen.queryByText(/^Crashed at/)).not.toBeInTheDocument();
+    expect(screen.getByText(/estimated from the slot clock/)).toBeInTheDocument();
+    projected = 1_018 + lag;
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(screen.getByText("Crashed at 1.50x")).toBeInTheDocument();
+  });
+
+  it("still shows a crash being played out when the next round opens before the curve gets there", () => {
+    vi.useFakeTimers();
+    const lag = presentationLag.forRound(902n);
+    let projected = 1_010 + lag;
+    const port = (overrides: Partial<LiveRound>) =>
+      game({
+        round: round({ roundId: 902n, startTick: 1_000n, ...overrides }),
+        estimatedTick: () => BigInt(Math.floor(projected)),
+        projectedTick: () => projected,
+      });
+    const { rerender } = render(ui(port({ phase: "running" })));
+    projected = 1_014 + lag;
+    rerender(ui(port({ phase: "crashed", crashPoint: 15_000n, crashTick: 18n })));
+    // The crank reveals and opens the next round at once.
+    rerender(ui(port({ roundId: 903n, phase: "betting", startTick: null, openedTick: 1_020n, bettingEndTick: 1_086n })));
+    expect(screen.queryByText(/^Crashed at/)).not.toBeInTheDocument();
+    expect(screen.getByText(/estimated from the slot clock/)).toBeInTheDocument();
+    projected = 1_018 + lag;
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(screen.getByText("1.50x")).toBeInTheDocument();
+    expect(screen.getByText("crashed")).toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(CRASH_HOLD_MS + 1_000);
+    });
+    expect(screen.queryByText("1.50x")).not.toBeInTheDocument();
+    expect(screen.getByText(/2 bets in round #903/)).toBeInTheDocument();
   });
 
   it("keeps a crash on screen for a moment after the next round opens, then shows its countdown", () => {
@@ -136,6 +209,35 @@ describe("CrashConsole", () => {
     });
     expect(screen.queryByText("1.50x")).not.toBeInTheDocument();
     expect(screen.getByText(/2 bets in round #8/)).toBeInTheDocument();
+  });
+
+  it("waits at 1.00x where the curve starts, and keeps the number in place at take-off", () => {
+    const { rerender } = render(ui(game({ round: round({ phase: "awaiting-entropy" }) })));
+    const launching = screen.getByText("1.00x");
+    rerender(ui(game({ round: round({ phase: "running", startTick: 1_000n }), estimatedTick: () => 1_000n })));
+    expect(screen.getByText("1.00x")).toBe(launching);
+  });
+
+  it("marks a recorded cash-out as pending the reveal, not as a win", () => {
+    const bet = { roundId: 7n, stake: 1_000_000n, autoCashOut: 0n, exposure: 100_000_000n, cashOutTick: 18n };
+    render(ui(game({ round: round({ phase: "running", startTick: 1_000n }), estimatedTick: () => 1_030n, myBet: bet })));
+    expect(screen.getByText("cashed out 1.53x")).toBeInTheDocument();
+    expect(screen.getByText(/1\.53 coins if the crash point is ≥ 1\.53x/)).toBeInTheDocument();
+    expect(screen.queryByText(/won/)).not.toBeInTheDocument();
+  });
+
+  it("shows the win once the crash point decides it, pending settlement", () => {
+    const bet = { roundId: 7n, stake: 1_000_000n, autoCashOut: 0n, exposure: 100_000_000n, cashOutTick: 10n };
+    render(ui(game({ round: round({ phase: "crashed", startTick: 1_000n, crashPoint: 15_000n, crashTick: 18n }), myBet: bet })));
+    expect(screen.getByText(/\+1\.26 coins/)).toBeInTheDocument();
+    expect(screen.getByText(/won at 1\.26x · pending settlement/)).toBeInTheDocument();
+  });
+
+  it("says plainly when a recorded cash-out came after the crash", () => {
+    const bet = { roundId: 7n, stake: 1_000_000n, autoCashOut: 0n, exposure: 100_000_000n, cashOutTick: 25n };
+    render(ui(game({ round: round({ phase: "crashed", startTick: 1_000n, crashPoint: 15_000n, crashTick: 18n }), myBet: bet })));
+    expect(screen.getByText(/came after the crash/)).toBeInTheDocument();
+    expect(screen.queryByText(/won/)).not.toBeInTheDocument();
   });
 
   it("flags voided rounds outside the normal lifecycle", () => {

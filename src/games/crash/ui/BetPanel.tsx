@@ -9,7 +9,7 @@ import { isBusy } from "@/platform/transactions/action-state";
 import { validateBet, type BetLimits } from "../domain/limits";
 import { rulesForVersion } from "../domain/rules";
 import { payoutFor, type Amount, type Multiplier } from "../domain/units";
-import { useCrashGame, type CrashGamePort } from "./crash-game";
+import { useCrashGame, type CrashGamePort, type LiveRound } from "./crash-game";
 import { formatMultiplier, parseMultiplierText } from "./multiplier-text";
 import {
   applyEarlyCrash,
@@ -25,6 +25,7 @@ import {
 import { playSound } from "./sound";
 import { useEarlyCrash } from "./use-early-crash";
 import { useEstimatedTick } from "./use-estimated-tick";
+import { useShownMultiplier } from "./use-shown-multiplier";
 
 /** A bet waiting for the next round (spec crash-client-v1 §6.2): one, in memory, cancelable. */
 interface QueuedBet {
@@ -72,7 +73,7 @@ function useConfirmedWin(game: CrashGamePort, outcome: MyBetOutcome): { roundId:
   }
   useEffect(() => {
     if (!won) return;
-    playSound("cashout");
+    playSound("settled");
     const id = setTimeout(() => setWon(null), 2_600);
     return () => clearTimeout(id);
   }, [won]);
@@ -222,13 +223,7 @@ export function BetPanel() {
           )}
         </div>
 
-        {offer && (
-          <button type="button" className={CASH_OUT_CLASS} disabled={busy} onClick={() => void game.cashOut()}>
-            <span className="text-lg uppercase tracking-widest">Cash out ~{formatMultiplier(offer.multiplier)}</span>
-            <span className="sr-only"> · </span>
-            <span className="text-sm font-normal tabular-nums text-fg">{formatCoins(offer.payout)} coins</span>
-          </button>
-        )}
+        {offer && round && game.myBet && <CashOutButton game={game} round={round} stake={game.myBet.stake} busy={busy} />}
 
         {win && (
           <p
@@ -394,6 +389,22 @@ export function BetPanel() {
         <ActionStatus action={game.action} explorerUrl={game.explorerUrl} />
       </div>
     </Panel>
+  );
+}
+
+/**
+ * Manual cash-out. Whether it is offered is decided on whole ticks (`cashOutOffer`); what it shows
+ * is the headline's own continuous multiplier, so both read the same (spec crash-client-v1 §5.2).
+ * The amount actually paid is set by the slot where the cash-out lands.
+ */
+function CashOutButton({ game, round, stake, busy }: { game: CrashGamePort; round: LiveRound; stake: Amount; busy: boolean }) {
+  const shown = useShownMultiplier(round, game, true);
+  return (
+    <button type="button" className={CASH_OUT_CLASS} disabled={busy} onClick={() => void game.cashOut()}>
+      <span className="text-lg uppercase tracking-widest tabular-nums">Cash out ~{formatMultiplier(shown)}</span>
+      <span className="sr-only"> · </span>
+      <span className="text-sm font-normal tabular-nums text-fg">~{formatCoins(payoutFor(stake, shown))} coins</span>
+    </button>
   );
 }
 

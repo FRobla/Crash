@@ -69,7 +69,9 @@ export function roundDisplay(round: ShownRound | null, tick: number | null, msPe
       return { kind: "launching" };
     case "running": {
       if (!rules || round.startTick === null || tick === null) return { kind: "running", multiplier: ONE_X };
-      return { kind: "running", multiplier: multiplierAt(rules, BigInt(Math.floor(tick)) - round.startTick) };
+      const multiplier = multiplierAt(rules, BigInt(Math.floor(tick)) - round.startTick);
+      // A crash played out as running (presentation-lag.ts) is never shown past its crash point.
+      return { kind: "running", multiplier: round.crashPoint !== null && round.crashPoint < multiplier ? round.crashPoint : multiplier };
     }
     case "crashed":
     case "settled":

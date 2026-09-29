@@ -6,11 +6,17 @@ import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import type { ReactNode } from "react";
 import { solanaConfig } from "../config";
+import { rateLimitRetryingFetch } from "../network/rate-limit-fetch";
 import { RpcHealthProvider } from "../network/RpcHealthProvider";
 import { reportWalletError } from "./wallet-errors";
 
-// Hoisted so the providers keep a stable Connection across renders.
-const CONNECTION_CONFIG: ConnectionConfig = { commitment: "confirmed" };
+// Hoisted so the providers keep a stable Connection across renders. 429s are retried like
+// web3.js does, but without its console.error per attempt (see rate-limit-fetch.ts).
+const CONNECTION_CONFIG: ConnectionConfig = {
+  commitment: "confirmed",
+  disableRetryOnRateLimit: true,
+  fetch: rateLimitRetryingFetch(),
+};
 // Wallets are discovered through the Wallet Standard (Phantom, Solflare, Backpack, ...),
 // so no per-wallet adapter packages are bundled.
 const WALLET_ADAPTERS: [] = [];

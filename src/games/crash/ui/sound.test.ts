@@ -34,3 +34,19 @@ describe("sound preference", () => {
     expect(() => sound.playSound("crash")).not.toThrow();
   });
 });
+
+describe("rise tone", () => {
+  it("climbs with the multiplier and is safe without audio", async () => {
+    const sound = await import("./sound");
+    expect(sound.riseFrequency(1)).toBe(150);
+    expect(sound.riseFrequency(0.5)).toBe(150);
+    expect(sound.riseFrequency(8)).toBeCloseTo(300);
+    expect(sound.riseFrequency(100)).toBeGreaterThan(sound.riseFrequency(10));
+    sound.setSoundEnabled(true);
+    expect(() => {
+      sound.startRise();
+      sound.setRise(2);
+      sound.stopRise();
+    }).not.toThrow();
+  });
+});

@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import devnet from "../fairness/fixtures/devnet-rounds.json";
 import { BetPanel } from "./BetPanel";
+import { CRASH_RULES_V1 } from "../domain/rules";
 import { CrashGameProvider, type CrashGamePort, type LiveRound } from "./crash-game";
+import { shownMultiplier } from "./live-intensity";
+import { presentationLag } from "./presentation-lag";
+import { formatMultiplier } from "./multiplier-text";
+import { multiplierAt } from "./round-view";
 
 const LIMITS = { minStake: 1_000_000n, maxStake: 2_000_000n, maxPayout: 200_000_000n, maxRoundExposure: 500_000_000n };
 
@@ -91,14 +96,19 @@ describe("BetPanel", () => {
     expect(screen.getByRole("button", { name: "Place bet" })).toHaveAccessibleDescription("Betting is closing.");
   });
 
-  it("offers a cash-out with the projected multiplier while the round runs", async () => {
+  it("offers a cash-out showing the headline's multiplier while the round runs", async () => {
+    const running = round({ phase: "running", startTick: 1_000n });
     const port = game({
-      round: round({ phase: "running", startTick: 1_000n }),
+      round: running,
       estimatedTick: () => 1_030n,
       myBet: { roundId: 7n, stake: 1_000_000n, autoCashOut: 0n, exposure: 100_000_000n, cashOutTick: null },
     });
     renderPanel(port);
-    const button = screen.getByRole("button", { name: /Cash out ~2\.03x/ });
+    // The same value as the headline: the round's presentation lag behind the projection.
+    const lag = presentationLag.forRound(running.roundId);
+    const shown = formatMultiplier(shownMultiplier(running, 1_030, false, lag));
+    expect(shown).toBe(formatMultiplier(multiplierAt(CRASH_RULES_V1, BigInt(30 - lag))));
+    const button = screen.getByRole("button", { name: new RegExp(`Cash out ~${shown.replace(".", "\\.")}`) });
     await userEvent.click(button);
     expect(port.cashOut).toHaveBeenCalled();
   });
