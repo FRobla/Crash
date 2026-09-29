@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Check, LoaderCircle, ShieldAlert, ShieldCheck, ShieldX, X } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { COMMIT_TAG, ENTROPY_TAG, toHex, verifyRound, type RoundEvidence, type Verification } from "../fairness/verify-round";
 import { formatMultiplier } from "./multiplier-text";
 
@@ -49,63 +50,95 @@ export function FairnessReport({ evidence, details }: FairnessReportProps) {
   }, [evidence]);
 
   return (
-    <div className="flex flex-col gap-4 p-4 text-sm">
+    <div className="flex flex-col gap-5 p-4 text-sm">
       <div role="status" aria-live="polite">
-        {result === null && <p className="text-muted">Verifying…</p>}
+        {result === null && (
+          <Banner tone="border-border bg-surface-raised/40 text-muted" icon={<LoaderCircle className="size-6 animate-spin" />}>
+            <p>Verifying…</p>
+          </Banner>
+        )}
         {result?.status === "verified" && (
-          <p className="text-accent">
-            Verified: round #{evidence.roundId.toString()} crashed at {formatMultiplier(evidence.crashPoint)}, exactly
-            as its pre-committed seed and the randomness determine.
-          </p>
+          <Banner tone="border-accent/40 bg-accent/10 text-accent" icon={<ShieldCheck className="size-7" />}>
+            <p>
+              Verified: round #{evidence.roundId.toString()} crashed at {formatMultiplier(evidence.crashPoint)}, exactly
+              as its pre-committed seed and the randomness determine.
+            </p>
+          </Banner>
         )}
         {result?.status === "mismatch" && (
-          <p className="text-danger">Verification FAILED: the recorded result does not match the committed inputs.</p>
+          <Banner tone="border-danger/50 bg-danger/10 text-danger" icon={<ShieldX className="size-7" />}>
+            <p>Verification FAILED: the recorded result does not match the committed inputs.</p>
+          </Banner>
         )}
-        {result?.status === "unverifiable" && <p className="text-warn">{UNVERIFIABLE[result.reason]}</p>}
+        {result?.status === "unverifiable" && (
+          <Banner tone="border-warn/40 bg-warn/10 text-warn" icon={<ShieldAlert className="size-7" />}>
+            <p>{UNVERIFIABLE[result.reason]}</p>
+          </Banner>
+        )}
       </div>
 
       {result && result.status !== "unverifiable" && (
-        <table className="w-full text-left text-xs">
-          <caption className="sr-only">Verification checks</caption>
-          <thead className="text-muted">
-            <tr>
-              <th className="py-1 pr-2 font-normal">Check</th>
-              <th className="py-1 pr-2 font-normal">Recorded</th>
-              <th className="py-1 pr-2 font-normal">Recomputed</th>
-              <th className="py-1 font-normal">Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.checks.map((check) => (
-              <tr key={check.name} className="border-t border-border align-top">
-                <td className="py-1 pr-2">{CHECK_LABEL[check.name]}</td>
-                <td className="py-1 pr-2 tabular-nums break-all">{formatCheck(check.name, check.expected)}</td>
-                <td className="py-1 pr-2 tabular-nums break-all">{formatCheck(check.name, check.actual)}</td>
-                <td className={`py-1 ${check.ok ? "text-accent" : "text-danger"}`}>{check.ok ? "match" : "MISMATCH"}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <caption className="sr-only">Verification checks</caption>
+            <thead className="text-muted">
+              <tr>
+                <th className="py-2 pr-3 font-normal uppercase tracking-widest">Check</th>
+                <th className="py-2 pr-3 font-normal uppercase tracking-widest">Recorded</th>
+                <th className="py-2 pr-3 font-normal uppercase tracking-widest">Recomputed</th>
+                <th className="py-2 font-normal uppercase tracking-widest">Result</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {result.checks.map((check, index) => (
+                <tr
+                  key={check.name}
+                  className="animate-rise-in border-t border-border align-top"
+                  style={{ animationDelay: `${index * 120}ms` }}
+                >
+                  <td className="py-2 pr-3">
+                    <span className="mr-2 text-muted">{index + 1}.</span>
+                    {CHECK_LABEL[check.name]}
+                  </td>
+                  <td className="py-2 pr-3 tabular-nums break-all">{formatCheck(check.name, check.expected)}</td>
+                  <td className="py-2 pr-3 tabular-nums break-all">{formatCheck(check.name, check.actual)}</td>
+                  <td className="py-2">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded border px-1.5 py-px ${
+                        check.ok ? "border-accent/30 bg-accent/10 text-accent" : "border-danger/40 bg-danger/10 text-danger"
+                      }`}
+                    >
+                      {check.ok ? <Check aria-hidden="true" className="size-3" /> : <X aria-hidden="true" className="size-3" />}
+                      {check.ok ? "match" : "MISMATCH"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
-        {details.map((detail) => (
-          <Row key={detail.label} label={detail.label} value={detail.value} />
-        ))}
-        <Row label="round id" value={evidence.roundId.toString()} />
-        <Row label="rules version" value={String(evidence.rulesVersion)} />
-        <Row label="commit" value={toHex(evidence.commit)} />
-        {evidence.outcome === "revealed" && (
-          <>
-            <Row label="seed (revealed)" value={toHex(evidence.seed)} />
-            <Row label="randomness (VRF output)" value={toHex(evidence.vrfOutput)} />
-          </>
-        )}
-        {result && result.status !== "unverifiable" && <Row label="entropy" value={toHex(result.entropy)} />}
-      </dl>
+      <section aria-label="Round data" className="rounded-md border border-border bg-bg/60 p-3">
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-[auto_1fr]">
+          {details.map((detail) => (
+            <Row key={detail.label} label={detail.label} value={detail.value} />
+          ))}
+          <Row label="round id" value={evidence.roundId.toString()} />
+          <Row label="rules version" value={String(evidence.rulesVersion)} />
+          <Row label="commit" value={toHex(evidence.commit)} />
+          {evidence.outcome === "revealed" && (
+            <>
+              <Row label="seed (revealed)" value={toHex(evidence.seed)} />
+              <Row label="randomness (VRF output)" value={toHex(evidence.vrfOutput)} />
+            </>
+          )}
+          {result && result.status !== "unverifiable" && <Row label="entropy" value={toHex(result.entropy)} />}
+        </dl>
+      </section>
 
-      <details className="text-xs text-muted">
-        <summary className="cursor-pointer">How to verify it yourself</summary>
+      <details className="group rounded-md border border-border px-3 py-2 text-xs text-muted open:bg-surface-raised/30">
+        <summary className="cursor-pointer select-none text-fg/80 hover:text-fg">How to verify it yourself</summary>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
           <li>
             commit = SHA-256(&quot;{COMMIT_TAG}&quot; ‖ program id (32 bytes) ‖ round id (u64 little-endian) ‖ seed) must
@@ -124,6 +157,17 @@ export function FairnessReport({ evidence, details }: FairnessReportProps) {
           </li>
         </ol>
       </details>
+    </div>
+  );
+}
+
+function Banner({ tone, icon, children }: { tone: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <div className={`flex animate-pop-in items-center gap-3 rounded-md border px-4 py-3 ${tone}`}>
+      <span aria-hidden="true" className="shrink-0">
+        {icon}
+      </span>
+      <div className="text-sm">{children}</div>
     </div>
   );
 }

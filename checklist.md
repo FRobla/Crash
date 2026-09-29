@@ -6,7 +6,7 @@ Iniciada el 2026-09-29. Revisión previa: JS (151 pruebas, lint, typecheck) y Ru
 
 ### 0. Cabos sueltos
 - [x] Estados de las specs corregidos: v1.1 → histórico, v2 → vigente (`crash-program.md`, `crash-program-v2.md`, `CLAUDE.md`)
-- [ ] Commit de la iteración 7 (lo gestiona el usuario)
+- [x] Commit de la iteración 7 (lo gestiona el usuario)
 - [ ] Aplazados, sin bloquear esta iteración: spec de progresión (`PROGRESSION_V1`) y ADR del chat (iteración 7, §3)
 
 ### 1. Spec (spec-first)

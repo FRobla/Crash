@@ -11,7 +11,7 @@ export function SolanaNetworkBadge() {
   return (
     <div className="flex items-center gap-3 text-xs">
       <span
-        className="border border-warn/50 px-1.5 py-0.5 font-semibold uppercase tracking-widest text-warn"
+        className="rounded border border-warn/50 bg-warn/10 px-1.5 py-0.5 font-semibold uppercase tracking-widest text-warn"
         title="Solana devnet: test network, tokens have no real value"
       >
         {SOLANA_CLUSTER}

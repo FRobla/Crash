@@ -91,6 +91,18 @@ describe("BetPanel", () => {
     expect(port.cashOut).toHaveBeenCalled();
   });
 
+  it("stops offering a manual cash-out once the auto cash-out target is reached", () => {
+    renderPanel(
+      game({
+        round: round({ phase: "running", startTick: 1_000n }),
+        estimatedTick: () => 1_030n,
+        myBet: { roundId: 7n, stake: 1_000_000n, autoCashOut: 20_000n, exposure: 2_000_000n, cashOutTick: null },
+      }),
+    );
+    expect(screen.queryByRole("button", { name: /Cash out/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Auto 2\.00x reached \(estimated\)/)).toBeInTheDocument();
+  });
+
   it("shows the rule-based outcome of a finished bet as pending settlement", () => {
     renderPanel(
       game({

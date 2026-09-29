@@ -126,7 +126,7 @@ Se escribe a mano, como el adaptador on-chain, a partir del SDK `@switchboard-xy
 
 - **Nombre:** se valida en el cliente con las mismas reglas que el programa (`[a-z0-9_]`, 3–16) y se comprueba que el `UsernameRecord` no exista antes de firmar. El programa sigue siendo quien decide.
 - **Valores por defecto de la sesión:** 216 000 slots (≈ 24 h), `spend_cap` = saldo tras la compra y `fee_budget` = 0.01 SOL (spec v2 §6). El usuario puede cambiar `spend_cap`.
-- **Auto cash-out:** multiplicador opcional con 2 decimales (`≥ 1.01x`, `≤` máximo de las reglas), convertido a diezmilésimas. Lo aplica el programa al liquidar: no necesita transacción.
+- **Auto cash-out:** multiplicador opcional con 2 decimales (`≥ 1.01x`, `≤` máximo de las reglas), convertido a diezmilésimas. Lo aplica el programa al liquidar: no necesita transacción. Cuando el multiplicador estimado alcanza el auto cash-out, la web deja de ofrecer el cash-out manual (el automático gana cualquier empate o cash-out posterior, reglas §6) y lo indica como "alcanzado (estimado)", sin darlo por ganado hasta el `reveal`.
 - **Validación previa:** antes de firmar se aplican `validateBet` y los límites de `HouseConfig`, y se comprueba que la sesión no esté caducada ni agote el tope. Un error del programa se muestra con su nombre (`BettingClosed`, `SessionSpendCapExceeded`…), nunca como éxito.
 
 ### 6.3 Clave de sesión en el navegador

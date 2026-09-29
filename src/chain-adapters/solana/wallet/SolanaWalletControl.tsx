@@ -7,7 +7,7 @@ import { shortenAddress } from "@/platform/wallets/wallet-session";
 import { useSolanaWalletSession } from "./use-solana-wallet-session";
 
 const BUTTON_CLASS =
-  "inline-flex items-center gap-2 border border-border px-3 py-1.5 text-sm transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border disabled:hover:text-fg";
+  "inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-sm transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border disabled:hover:text-fg";
 
 export function SolanaWalletControl() {
   const session = useSolanaWalletSession();
@@ -18,7 +18,7 @@ export function SolanaWalletControl() {
     return (
       <div className="flex items-center gap-2">
         <span
-          className="inline-flex items-center gap-2 border border-border bg-surface px-3 py-1.5 text-sm"
+          className="inline-flex items-center gap-2 rounded-md border border-accent/30 bg-accent/5 px-3 py-1.5 text-sm"
           title={session.address}
         >
           <Wallet aria-hidden="true" className="size-4 text-accent" />

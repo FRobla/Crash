@@ -106,14 +106,31 @@ export function checkNewBet(
   return result.ok ? { ok: true, exposure: result.value } : { ok: false, reason: REJECTION_TEXT[result.error] };
 }
 
-/** The live cash-out offer for the player's bet in the running round, if any. */
+/**
+ * The live cash-out offer for the player's bet in the running round, if any. None once the
+ * projected multiplier reaches the bet's auto cash-out: from then on the auto cash-out wins any
+ * tie or later manual one (crash-round-rules.md §6), so the button could not pay what it shows.
+ */
 export function cashOutOffer(round: LiveRound | null, myBet: MyBet | null, tick: bigint | null) {
   if (!round || round.phase !== "running" || !myBet || myBet.roundId !== round.roundId) return null;
   if (myBet.cashOutTick !== null || round.startTick === null || tick === null) return null;
   const rules = rulesForVersion(round.rulesVersion);
   if (!rules) return null;
   const multiplier = multiplierAt(rules, tick - round.startTick);
+  if (autoTargetReached(myBet, multiplier)) return null;
   return { multiplier, payout: payoutFor(myBet.stake, multiplier) };
+}
+
+/** Whether a projected multiplier has reached the bet's auto cash-out (projection, not a result). */
+export function autoTargetReached(myBet: MyBet, multiplier: Multiplier): boolean {
+  return myBet.autoCashOut !== 0n && multiplier >= myBet.autoCashOut;
+}
+
+/** The projected running multiplier for the player's open bet, if the round is running. */
+export function projectedMultiplier(round: LiveRound | null, tick: bigint | null): Multiplier | null {
+  if (!round || round.phase !== "running" || round.startTick === null || tick === null) return null;
+  const rules = rulesForVersion(round.rulesVersion);
+  return rules ? multiplierAt(rules, tick - round.startTick) : null;
 }
 
 /** Recognized multiplier of a recorded cash-out tick. */

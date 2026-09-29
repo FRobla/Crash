@@ -6,17 +6,22 @@ import { RecentRounds } from "./recent-rounds";
 
 export const metadata: Metadata = { title: "Crash" };
 
+/** On small screens the bet panel follows the live round directly, before history and account. */
 export default function CrashPage() {
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr]">
       <h1 className="sr-only">Crash</h1>
-      <div className="flex min-w-0 flex-col gap-4">
+      <div className="min-w-0 lg:col-start-1 lg:row-start-1">
         <CrashConsole />
-        <RecentRounds />
       </div>
-      <div className="flex flex-col gap-4 lg:self-start">
-        <BetPanel />
-        <PlayerPanel />
+      <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
+        <div className="flex flex-col gap-4">
+          <BetPanel />
+          <PlayerPanel />
+        </div>
+      </div>
+      <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+        <RecentRounds />
       </div>
     </div>
   );

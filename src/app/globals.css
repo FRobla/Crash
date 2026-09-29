@@ -1,16 +1,123 @@
 @import "tailwindcss";
 
-/* Dark, terminal-inspired palette. Text colors keep WCAG AA contrast on bg and surface. */
+/*
+ * Dark, terminal-inspired palette. Text colors keep WCAG AA contrast on bg and surface.
+ * Status colors (accent/warn/danger) always ship with a text label or icon, never color alone.
+ */
 @theme {
-  --color-bg: #0b0d10;
-  --color-surface: #12161b;
-  --color-surface-raised: #171c22;
+  --color-bg: #0a0c0f;
+  --color-sunken: #07090b;
+  --color-surface: #11151a;
+  --color-surface-raised: #171c23;
   --color-border: #232a33;
-  --color-fg: #d7dde4;
+  --color-border-strong: #33404d;
+  --color-grid: #1b222a;
+  --color-fg: #dfe5eb;
   --color-muted: #8a96a3;
   --color-accent: #4ade80;
   --color-danger: #f87171;
   --color-warn: #fbbf24;
+  --color-info: #7dd3fc;
+
+  --animate-fade-in: fade-in 240ms ease-out both;
+  --animate-rise-in: rise-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-pop-in: pop-in 420ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  --animate-crash-flash: crash-flash 900ms ease-out both;
+  --animate-win-flash: win-flash 1100ms ease-out both;
+  --animate-shake: shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  --animate-halo: halo 1.4s ease-out infinite;
+  --animate-live-dot: live-dot 2s ease-in-out infinite;
+  --animate-glow: glow 1.6s ease-in-out infinite;
+  --animate-indeterminate: indeterminate 1.4s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.85);
+    }
+  }
+  @keyframes crash-flash {
+    0% {
+      opacity: 0.55;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes win-flash {
+    0% {
+      box-shadow: 0 0 0 0 rgb(74 222 128 / 0.55);
+    }
+    100% {
+      box-shadow: 0 0 0 14px rgb(74 222 128 / 0);
+    }
+  }
+  @keyframes shake {
+    10%,
+    90% {
+      transform: translateX(-1px);
+    }
+    20%,
+    80% {
+      transform: translateX(3px);
+    }
+    30%,
+    50%,
+    70% {
+      transform: translateX(-5px);
+    }
+    40%,
+    60% {
+      transform: translateX(5px);
+    }
+  }
+  @keyframes halo {
+    0% {
+      r: 5;
+      opacity: 0.6;
+    }
+    100% {
+      r: 18;
+      opacity: 0;
+    }
+  }
+  @keyframes live-dot {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+  @keyframes glow {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgb(251 191 36 / 0);
+    }
+    50% {
+      box-shadow: 0 0 22px 2px rgb(251 191 36 / 0.35);
+    }
+  }
+  @keyframes indeterminate {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(300%);
+    }
+  }
 }
 
 @theme inline {
@@ -23,6 +130,29 @@
 
 body {
   @apply bg-bg font-mono text-fg;
+  /* A faint dot grid, like an operations console. Decorative only. */
+  background-image: radial-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgb(74 222 128 / 0.3);
+}
+
+/* Motion is decoration: users who ask for less get none, and nothing depends on it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }
 
 /* Keep the wallet adapter modal inside the terminal visual language. */

@@ -211,3 +211,13 @@
     - falta probar la web con una wallet real de navegador;
     - ≈ 0.093 SOL de devnet quedaron en claves E2E desechables perdidas antes de hacer reanudable el script.
   - **Estado al cerrar la sesión:** el crank está parado. La ronda 41 quedó abierta con su semilla guardada fuera del repo, así que el próximo arranque la retoma o la anula sin pérdidas. El saldo del operador es de 2.21 SOL.
+- **Rediseño de la interfaz** (solo presentación: no cambian puertos, programa, reglas ni flujos de dinero).
+  - **Crash:** gráfico en vivo de la curva de las reglas (SVG, ejes con escala automática, crosshair con el multiplicador reconocido en cada tick), línea del auto cash-out propio, marca del cash-out registrado, cuenta atrás circular de la ventana de apuestas, indicador de espera de randomness, destello al crash y pista del ciclo de vida de la ronda (Bets → Randomness → Live → Revealed → Settled). Entre slots, solo la punta de la curva se interpola para animarla; el número mostrado sigue siendo el multiplicador reconocido del tick estimado.
+  - **Apuesta:** saldo destacado, atajos de stake (½, 2×, min, max) y de auto cash-out (off, 1.5x, 2x, 3x, 10x), vista previa del pago con `payoutFor`, botón de cash-out con el pago en vivo y tarjeta de la apuesta con el resultado según las reglas.
+  - **Cambio de comportamiento:** cuando el multiplicador estimado alcanza el auto cash-out de la apuesta, ya no se ofrece el cash-out manual (el automático gana cualquier empate o cash-out posterior, reglas §6, así que el botón prometía un pago imposible). Se muestra "alcanzado (estimado)" sin darlo por ganado. Spec del cliente §6.2 actualizada.
+  - **Cuenta:** avatar, saldo, medidor de gasto de la sesión frente a su tope, caducidad y atajos de compra.
+  - **Transacciones:** progreso firma → envío → confirmación con el mismo texto de estado de antes.
+  - **Rondas recientes e History:** barras de crash points en escala logarítmica con la referencia de 2.00x; resúmenes (mediana, rondas ≥ 2x, resultado neto de las últimas apuestas) calculados en `bigint` sobre la ventana cargada, y columna de neto por apuesta.
+  - **Fairness:** veredicto destacado, comprobaciones con insignias y accesos directos a las rondas recientes.
+  - **Accesibilidad:** las animaciones se desactivan con `prefers-reduced-motion`; el estado nunca depende solo del color; el directo de la ronda solo anuncia cambios de fase; se conservan los anillos de foco. Sin dependencias nuevas.
+  - **Pruebas:** 233 en Vitest (antes 220), incluidas la geometría del gráfico, los resúmenes de History, la consola y la regla del cash-out tras el auto.
